@@ -30,45 +30,101 @@ type ApiFootballFixture = {
 };
 
 const leaguePriority = new Map<number, number>([
+  // International
   [1, 1],
   [4, 2],
-  [2, 3],
-  [3, 4],
-  [5, 5],
-  [848, 6],
-  [39, 10],
-  [140, 11],
-  [135, 12],
-  [78, 13],
-  [61, 14],
-  [15, 15],
-  [9, 16],
-  [45, 20],
-  [143, 21],
-  [137, 22],
-  [81, 23],
-  [66, 24],
+  [5, 3],
+  [9, 4],
+  [2, 5],
+  [3, 6],
+  // France
+  [61, 10],
+  [62, 11],
+  // Angleterre
+  [39, 20],
+  [40, 21],
+  // Espagne
+  [140, 30],
+  [141, 31],
+  // Italie
+  [135, 40],
+  [136, 41],
+  // Allemagne
+  [78, 50],
+  [79, 51],
+  // Portugal
+  [94, 60],
+  [95, 61],
+  // Pays-Bas
+  [88, 70],
+  [89, 71],
+  // Belgique
+  [144, 80],
+  [145, 81],
+  // Turquie
+  [203, 90],
+  [204, 91],
+  // Bresil
+  [71, 100],
+  [72, 101],
+  // Argentine
+  [128, 110],
+  [129, 111],
+  // Etats-Unis, Canada, Mexique
+  [253, 120],
+  [255, 121],
+  [262, 130],
+  [263, 131],
 ]);
 
 const leagueNamePriority: Array<[RegExp, number]> = [
   [/world cup/i, 1],
   [/\beuro\b|european championship/i, 2],
-  [/champions league/i, 3],
-  [/europa league/i, 4],
-  [/nations league/i, 5],
-  [/conference league/i, 6],
-  [/premier league/i, 10],
-  [/la liga|primera division/i, 11],
-  [/serie a/i, 12],
-  [/bundesliga/i, 13],
-  [/ligue 1/i, 14],
-  [/club world cup/i, 15],
-  [/copa america/i, 16],
-  [/fa cup/i, 20],
-  [/copa del rey/i, 21],
-  [/coppa italia/i, 22],
-  [/dfb pokal/i, 23],
-  [/coupe de france/i, 24],
+  [/nations league/i, 3],
+  [/copa america/i, 4],
+  [/champions league/i, 5],
+  [/europa league/i, 6],
+  [/ligue 1|mcdonald/i, 10],
+  [/ligue 2|bkt/i, 11],
+  [/premier league/i, 20],
+  [/championship/i, 21],
+  [/hypermotion|segunda division/i, 31],
+  [/laliga|la liga|primera division/i, 30],
+  [/serie b/i, 41],
+  [/serie a|enilive/i, 40],
+  [/2\. bundesliga|zweite bundesliga/i, 51],
+  [/bundesliga$/i, 50],
+  [/liga portugal 2|segunda liga|meu super/i, 61],
+  [/liga portugal|primeira liga|betclic/i, 60],
+  [/eredivisie/i, 70],
+  [/keuken kampioen|eerste divisie/i, 71],
+  [/jupiler pro league|first division a/i, 80],
+  [/challenger pro league|first division b/i, 81],
+  [/super lig|süper lig/i, 90],
+  [/1\. lig/i, 91],
+  [/brasileir|serie a/i, 100],
+  [/brasil.*serie b|série b/i, 101],
+  [/liga profesional|primera division/i, 110],
+  [/primera nacional/i, 111],
+  [/major league soccer|\bmls\b/i, 120],
+  [/usl championship/i, 121],
+  [/liga mx/i, 130],
+  [/liga de expansion|expansión mx/i, 131],
+];
+
+const teamPriority: Array<[RegExp, number]> = [
+  [/france/i, 1],
+  [/spain|espagne/i, 1],
+  [/argentina|argentine/i, 2],
+  [/england|angleterre/i, 2],
+  [/brazil|brasil|brésil/i, 3],
+  [/portugal/i, 3],
+  [/germany|allemagne/i, 4],
+  [/italy|italie/i, 4],
+  [/netherlands|pays-bas|holland/i, 5],
+  [/belgium|belgique/i, 5],
+  [/mexico|mexique/i, 6],
+  [/uruguay/i, 6],
 ];
 
 function todayKey() {
@@ -99,17 +155,37 @@ function formatKickoff(date?: string) {
   }).format(kickoff)}`;
 }
 
+function teamScore(name?: string) {
+  if (!name) return 50;
+
+  return teamPriority.find(([pattern]) => pattern.test(name))?.[1] ?? 50;
+}
+
+function fixtureAttractiveness(fixture: ApiFootballFixture) {
+  const home = fixture.teams?.home?.name ?? "";
+  const away = fixture.teams?.away?.name ?? "";
+  const pair = `${home} ${away}`;
+
+  if (/france/i.test(pair) && /spain|espagne/i.test(pair)) return 0;
+
+  return teamScore(home) + teamScore(away);
+}
+
 function scoreFixture(fixture: ApiFootballFixture) {
   const leagueId = fixture.league?.id ?? 0;
   const leagueName = fixture.league?.name ?? "";
   const namePriority =
     leagueNamePriority.find(([pattern]) => pattern.test(leagueName))?.[1] ?? 99;
-  const leagueScore = Math.min(leaguePriority.get(leagueId) ?? 99, namePriority);
+  const leagueScore = leaguePriority.get(leagueId) ?? namePriority;
   const kickoff = fixture.fixture?.date
     ? new Date(fixture.fixture.date).getTime()
     : Number.MAX_SAFE_INTEGER;
 
-  return leagueScore * 10_000_000_000 + kickoff;
+  return (
+    leagueScore * 10_000_000_000_000 +
+    fixtureAttractiveness(fixture) * 10_000_000_000 +
+    kickoff
+  );
 }
 
 function toMatch(fixture: ApiFootballFixture) {

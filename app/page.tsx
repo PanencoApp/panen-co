@@ -89,6 +89,7 @@ export default function Home() {
     () => dailyMatches.find((match) => match.id === selectedMatch),
     [dailyMatches, selectedMatch],
   );
+  const mainMatch = dailyMatches[0] ?? null;
   const selectedChallenge = useMemo(
     () =>
       dailyMatches.find((match) => match.id === challengeMatch) ??
@@ -685,15 +686,17 @@ export default function Home() {
                     ? "border-[#00baff]/70 bg-[#00baff]/10 text-[#00baff]"
                     : todayDonePredictions.length > 0
                       ? "border-green-400/60 bg-green-400/10 text-green-300"
-                      : "border-[#d9e1ea] bg-white text-[#4e596b]") +
-                  " my-4 rounded-2xl border px-3 py-3 text-center text-sm font-black"
+                    : "border-[#d9e1ea] bg-white text-[#4e596b]") +
+                  " my-4 rounded-2xl border px-3 py-3 text-sm font-black"
                 }
               >
                 {activePredictions.length > 0
                   ? `${activePredictions.length} pr\u00e9diction${activePredictions.length > 1 ? "s" : ""} en cours`
                   : todayDonePredictions.length > 0
                     ? `${todayDonePredictions.length} pr\u00e9diction${todayDonePredictions.length > 1 ? "s" : ""} termin\u00e9e${todayDonePredictions.length > 1 ? "s" : ""}`
-                    : "Aucune pr\u00e9diction en cours"}
+                    : mainMatch
+                      ? <HomeMatchPreview match={mainMatch} matchCount={dailyMatches.length} />
+                      : "Match principal bient\u00f4t disponible"}
               </div>
               <button
                 className="h-13 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black shadow-[0_0_26px_rgba(0,186,255,.22)]"
@@ -749,7 +752,9 @@ export default function Home() {
                 {challengeStep === "result"
                   ? "D\u00e9fi termin\u00e9"
                   : challengeStep === "setup"
-                    ? "Aucun d\u00e9fi en cours"
+                    ? mainMatch
+                      ? <HomeMatchPreview match={mainMatch} matchCount={dailyMatches.length} />
+                      : "Match principal bient\u00f4t disponible"
                     : "D\u00e9fi en cours"}
               </div>
               <button
@@ -1133,15 +1138,15 @@ export default function Home() {
 function SplashScreen() {
   return (
     <main className="flex h-screen flex-col items-center justify-center overflow-hidden bg-black px-8 text-white">
-      <div className="grid flex-1 place-items-center pb-20">
-        <div className="grid h-32 w-[280px] place-items-center bg-black">
+      <div className="grid flex-1 place-items-center pb-32">
+        <div className="grid h-28 w-[245px] place-items-center bg-black">
           <Image
             alt="Panen&Co"
             className="h-auto w-full animate-[splash-fade_1.2s_ease-out_forwards] object-contain opacity-0"
-            height={128}
+            height={112}
             priority
             src="/panen-co-big-logo.png"
-            width={280}
+            width={245}
             unoptimized
           />
         </div>
@@ -1189,6 +1194,30 @@ function MatchLogos({ match }: { match: MatchOption }) {
   );
 }
 
+function HomeMatchPreview({
+  match,
+  matchCount,
+}: {
+  match: MatchOption;
+  matchCount: number;
+}) {
+  const otherMatches = Math.max(0, matchCount - 1);
+
+  return (
+    <span className="flex items-center justify-center gap-3 text-left">
+      <MatchLogos match={match} />
+      <span>
+        <span className="block text-[#0b0f19]">{match.label}</span>
+        {otherMatches > 0 && (
+          <small className="mt-0.5 block text-[11px] font-black text-[#697386]">
+            + {otherMatches} autres
+          </small>
+        )}
+      </span>
+    </span>
+  );
+}
+
 function Onboarding({
   step,
   isBusy,
@@ -1215,17 +1244,6 @@ function Onboarding({
       }
     >
       <div className="mx-auto flex h-full w-full max-w-[500px] flex-col gap-5 px-5 py-4">
-        <header className="flex items-center justify-end">
-          <span
-            className={
-              (isIntro ? "text-white/45" : "text-[#7c8799]") +
-              " text-xs font-black uppercase"
-            }
-          >
-            {step}/2
-          </span>
-        </header>
-
         {step === 1 ? (
           <section className="relative flex flex-1 flex-col items-center justify-center text-center">
             <div className="pointer-events-none absolute -left-16 top-12 h-36 w-24 rotate-[-18deg] rounded-[40%] border border-white/[.06] bg-white/[.025] blur-[2px]" />

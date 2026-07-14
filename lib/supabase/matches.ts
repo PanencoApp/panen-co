@@ -62,6 +62,22 @@ function toMatchOption(row: MatchRow, fallbackMatches: MatchOption[]) {
   };
 }
 
+function mergeMatchesInApiOrder(rows: MatchRow[], sourceMatches: MatchOption[]) {
+  const rowByExternalId = new Map(
+    rows
+      .filter((row) => row.external_id)
+      .map((row) => [row.external_id as string, row]),
+  );
+
+  return sourceMatches.map((sourceMatch) => {
+    const row = rowByExternalId.get(sourceMatch.id);
+
+    if (!row) return sourceMatch;
+
+    return toMatchOption(row, sourceMatches);
+  });
+}
+
 async function seedMissingMatches(fallbackMatches: MatchOption[]) {
   if (!supabase) return;
 
@@ -137,9 +153,7 @@ export async function getTodayMatches(): Promise<MatchesResult> {
     .in(
       "external_id",
       sourceMatches.map((match) => match.id),
-    )
-    .order("kickoff_at", { ascending: true })
-    .limit(5);
+    );
 
   if (result.error || !result.data || result.data.length === 0) {
     return {
@@ -149,9 +163,7 @@ export async function getTodayMatches(): Promise<MatchesResult> {
   }
 
   return {
-    data: (result.data as MatchRow[]).map((row) =>
-      toMatchOption(row, sourceMatches),
-    ),
+    data: mergeMatchesInApiOrder(result.data as MatchRow[], sourceMatches),
     error: null,
   };
 }

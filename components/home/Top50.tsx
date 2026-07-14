@@ -35,7 +35,7 @@ export function Top50({ players }: { players: TopPlayer[] }) {
                 {player.points} pts
               </b>
               <small className="mt-1 block text-xs font-black text-emerald-600">
-                {player.reward} &euro;
+                +{player.reward} &euro;
               </small>
             </span>
           </div>

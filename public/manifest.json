@@ -1,0 +1,26 @@
+{
+  "name": "Panen&Co",
+  "short_name": "Panen&Co",
+  "description": "Predictions football gratuites, classement hebdomadaire et defis entre amis.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef3f8",
+  "theme_color": "#00baff",
+  "categories": ["sports", "games", "entertainment"],
+  "icons": [
+    {
+      "src": "/panen-co-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/panen-co-home-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

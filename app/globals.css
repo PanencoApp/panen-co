@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  --background: #eef3f8;
+  --foreground: #05070d;
+  --font-primary: "Montserrat", Arial, Helvetica, sans-serif;
+  --font-accent: "Saira", "Montserrat", Arial, Helvetica, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-primary);
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--background);
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-primary);
+  font-weight: 600;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-accent);
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+strong,
+b {
+  font-family: var(--font-accent);
+  letter-spacing: 0;
+}
+
+.input {
+  min-height: 48px;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid #d9e1ea;
+  background: #ffffff;
+  padding: 0 12px;
+  color: #05070d;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #00baff;
+  box-shadow: 0 0 0 4px rgba(0, 186, 255, 0.16);
+}
+
+select.input option {
+  background: #ffffff;
+  color: #05070d;
+}
+
+@keyframes splash-load {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}

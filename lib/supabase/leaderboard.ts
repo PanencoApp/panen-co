@@ -100,30 +100,37 @@ function fillWithVirtualPlayers(
   currentUserId?: string | null,
 ) {
   const usedPseudos = new Set(players.map((player) => player.pseudo));
-  const filled = [...players];
+  const virtualPlayers: TopPlayer[] = [];
 
   for (const pseudo of virtualPseudos) {
-    if (filled.length >= 50) break;
+    if (virtualPlayers.length >= 50) break;
     if (usedPseudos.has(pseudo)) continue;
 
-    const rank = filled.length + 1;
+    const virtualRank = virtualPlayers.length + 1;
 
-    filled.push({
-      rank,
+    virtualPlayers.push({
+      rank: virtualRank,
       pseudo,
-      points: virtualScore(rank),
-      reward: rewardForRank(rank),
+      points: virtualScore(virtualRank),
+      reward: rewardForRank(virtualRank),
       isCurrentUser: false,
       isVirtual: true,
     });
   }
 
-  return filled.map((player, index) => ({
-    ...player,
-    rank: index + 1,
-    reward: rewardForRank(index + 1),
-    isCurrentUser: player.isCurrentUser || player.pseudo === currentUserId,
-  }));
+  return [...players, ...virtualPlayers]
+    .sort((left, right) => {
+      if (right.points !== left.points) return right.points - left.points;
+      if (left.isVirtual === right.isVirtual) return left.pseudo.localeCompare(right.pseudo);
+      return left.isVirtual ? 1 : -1;
+    })
+    .slice(0, 50)
+    .map((player, index) => ({
+      ...player,
+      rank: index + 1,
+      reward: rewardForRank(index + 1),
+      isCurrentUser: player.isCurrentUser || player.pseudo === currentUserId,
+    }));
 }
 
 export async function getWeeklyLeaderboard(currentUserId?: string | null) {

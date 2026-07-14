@@ -12,8 +12,8 @@ export const metadata: Metadata = {
     title: "Panen&Co",
   },
   icons: {
-    icon: "/panen-co-logo.png",
-    apple: "/panen-co-home-logo.png",
+    icon: "/panen-co-small-logo.png",
+    apple: "/panen-co-small-logo.png",
   },
 };
 

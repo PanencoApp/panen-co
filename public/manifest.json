@@ -11,13 +11,13 @@
   "categories": ["sports", "games", "entertainment"],
   "icons": [
     {
-      "src": "/panen-co-logo.png",
+      "src": "/panen-co-small-logo.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/panen-co-home-logo.png",
+      "src": "/panen-co-small-logo.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "maskable"

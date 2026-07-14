@@ -15,6 +15,7 @@ import { Field } from "@/components/ui/Field";
 import { Header } from "@/components/ui/Header";
 import { Top50 } from "@/components/home/Top50";
 import {
+  checkProfileAvailability,
   getCurrentUser,
   getProfile,
   signInWithEmail,
@@ -466,10 +467,26 @@ export default function Home() {
     setAuthBusy(true);
 
     try {
+      const availability = await checkProfileAvailability({ pseudo, email });
+
+      if (!availability.data.pseudoAvailable) {
+        window.alert("Ce pseudo est deja utilise. Choisis-en un autre.");
+        return;
+      }
+
+      if (!availability.data.emailAvailable) {
+        window.alert("Cette adresse email est deja utilisee. Connecte-toi plutot.");
+        return;
+      }
+
       const result = await signUpWithEmail({ pseudo, email, password });
 
       if (result.error) {
-        window.alert(result.error.message);
+        window.alert(
+          result.error.message.toLowerCase().includes("already")
+            ? "Ce pseudo ou cet email est deja utilise."
+            : result.error.message,
+        );
         return;
       }
 
@@ -605,18 +622,16 @@ export default function Home() {
                 </h1>
               </div>
               <button
-                className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-black shadow-[0_12px_30px_rgba(15,23,42,.10)]"
+                className="grid h-12 w-12 place-items-center rounded-full bg-white shadow-[0_12px_30px_rgba(15,23,42,.10)]"
                 onClick={() => setShowProfile(true)}
                 type="button"
-                aria-label="Profil"
+                aria-label="Menu"
               >
-                <Image
-                  alt="Panen&Co"
-                  className="h-9 w-9 object-contain"
-                  height={36}
-                  src="/panen-co-small-logo.png"
-                  width={36}
-                />
+                <span className="grid gap-1.5">
+                  <span className="block h-0.5 w-6 rounded-full bg-[#0b0f19]" />
+                  <span className="block h-0.5 w-6 rounded-full bg-[#0b0f19]" />
+                  <span className="block h-0.5 w-6 rounded-full bg-[#0b0f19]" />
+                </span>
               </button>
             </header>
 
@@ -781,13 +796,14 @@ export default function Home() {
                             (locked
                               ? "cursor-not-allowed border-[#d9e1ea] bg-[#f7f9fc] opacity-40 grayscale"
                               : "border-[#d9e1ea] bg-white") +
-                            " grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border p-3 text-left"
+                            " grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border p-3 text-left"
                           }
                           disabled={locked}
                           key={match.id}
                           onClick={() => setSelectedMatch(match.id)}
                           type="button"
                         >
+                          <MatchLogos match={match} />
                           <span>
                             <strong className="block">{match.label}</strong>
                             <small className="text-[#5f6b7f]">{match.time}</small>
@@ -989,7 +1005,7 @@ export default function Home() {
                         (challengeMatch === match.id
                           ? "border-[#00baff] bg-[#00baff]/10"
                           : "border-[#d9e1ea] bg-[#eef3f8]") +
-                        " rounded-2xl border p-3 text-left"
+                        " grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl border p-3 text-left"
                       }
                       key={match.id}
                       onClick={() => {
@@ -998,10 +1014,13 @@ export default function Home() {
                       }}
                       type="button"
                     >
-                      <strong className="block">{match.label}</strong>
-                      <small className="font-bold text-[#5f6b7f]">
-                        {match.time}
-                      </small>
+                      <MatchLogos match={match} />
+                      <span>
+                        <strong className="block">{match.label}</strong>
+                        <small className="font-bold text-[#5f6b7f]">
+                          {match.time}
+                        </small>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -1114,15 +1133,15 @@ export default function Home() {
 function SplashScreen() {
   return (
     <main className="flex h-screen flex-col items-center justify-center overflow-hidden bg-black px-8 text-white">
-      <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="grid h-40 w-[320px] place-items-center bg-black">
+      <div className="grid flex-1 place-items-center pb-20">
+        <div className="grid h-32 w-[280px] place-items-center bg-black">
           <Image
             alt="Panen&Co"
             className="h-auto w-full animate-[splash-fade_1.2s_ease-out_forwards] object-contain opacity-0"
-            height={160}
+            height={128}
             priority
             src="/panen-co-big-logo.png"
-            width={320}
+            width={280}
             unoptimized
           />
         </div>
@@ -1131,6 +1150,42 @@ function SplashScreen() {
         <div className="h-full w-full origin-left animate-[splash-load_1.8s_ease-out_forwards] rounded-full bg-[#00baff]" />
       </div>
     </main>
+  );
+}
+
+function MatchLogos({ match }: { match: MatchOption }) {
+  const logos = [
+    { alt: "Equipe domicile", src: match.homeLogo },
+    { alt: "Equipe exterieure", src: match.awayLogo },
+  ];
+
+  return (
+    <span className="flex w-14 items-center">
+      {logos.map((logo, index) => (
+        <span
+          className={
+            (index === 1 ? "-ml-2" : "") +
+            " grid h-9 w-9 place-items-center overflow-hidden rounded-full border-2 border-white bg-[#eef3f8] shadow-[0_6px_16px_rgba(15,23,42,.10)]"
+          }
+          key={`${match.id}-${index}`}
+        >
+          {logo.src ? (
+            <Image
+              alt={logo.alt}
+              className="h-7 w-7 object-contain"
+              height={28}
+              src={logo.src}
+              unoptimized
+              width={28}
+            />
+          ) : (
+            <span className="text-xs font-black text-[#00baff]">
+              {index === 0 ? "D" : "E"}
+            </span>
+          )}
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -1159,7 +1214,7 @@ function Onboarding({
           : "h-screen overflow-hidden bg-[#eef3f8] text-[#0b0f19]"
       }
     >
-      <div className="mx-auto flex h-full w-full max-w-[500px] flex-col justify-between px-5 py-5">
+      <div className="mx-auto flex h-full w-full max-w-[500px] flex-col gap-5 px-5 py-4">
         <header className="flex items-center justify-end">
           <span
             className={
@@ -1178,7 +1233,7 @@ function Onboarding({
             <div className="pointer-events-none absolute bottom-20 left-2 h-28 w-24 rotate-[22deg] rounded-[2rem] border border-[#00baff]/10 bg-[#00baff]/[.04] blur-[3px]" />
 
             <div className="grid justify-items-center">
-              <h1 className="bg-gradient-to-r from-white via-[#dcecff] to-[#00baff] bg-clip-text text-[3.25rem] font-black leading-[1.04] text-transparent">
+              <h1 className="bg-gradient-to-r from-white via-[#dcecff] to-[#00baff] bg-clip-text text-[3rem] font-black leading-[1.02] text-transparent">
                 Pr&eacute;dire. Grimper. R&eacute;colter.
               </h1>
               <p className="mt-5 max-w-[330px] text-sm font-bold leading-5 text-white">
@@ -1187,7 +1242,7 @@ function Onboarding({
                 r&eacute;compenses de la semaine.
               </p>
 
-              <div className="mt-10 rounded-full border border-white/10 bg-white/[.05] px-6 py-4 shadow-[0_0_32px_rgba(0,186,255,.12)]">
+              <div className="mt-7 rounded-full border border-white/10 bg-white/[.05] px-6 py-3 shadow-[0_0_32px_rgba(0,186,255,.12)]">
                 <div className="flex items-center justify-center gap-1 text-xl text-[#ffc66d]">
                   <span>&#9733;</span>
                   <span>&#9733;</span>
@@ -1202,12 +1257,12 @@ function Onboarding({
             </div>
           </section>
         ) : (
-          <form className="grid gap-4" onSubmit={onComplete}>
+          <form className="grid flex-1 content-center gap-3" onSubmit={onComplete}>
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-[#00baff]">
                 Inscription
               </p>
-              <h1 className="mt-3 text-3xl font-black leading-tight">
+              <h1 className="mt-2 text-3xl font-black leading-tight">
                 Cree ton profil en quelques secondes.
               </h1>
             </div>
@@ -1262,7 +1317,7 @@ function Onboarding({
           </form>
         )}
 
-        <footer className="grid gap-3">
+        <footer className="grid gap-3 pb-3">
           {step === 1 ? (
             <>
               <button

@@ -20,7 +20,7 @@ export function Top50({ players }: { players: TopPlayer[] }) {
             }
             key={player.rank}
           >
-            <strong className="text-[#00baff]">#{player.rank}</strong>
+            <strong className="text-[#00baff]">{player.rank}</strong>
             <span
               className={
                 player.isCurrentUser
@@ -34,7 +34,7 @@ export function Top50({ players }: { players: TopPlayer[] }) {
               <b className="block rounded-2xl bg-[#00baff] px-3 py-2 text-lg font-black text-black shadow-[0_0_20px_rgba(0,186,255,.24)]">
                 {player.points} pts
               </b>
-              <small className="mt-1 block text-xs font-black text-[#5f6b7f]">
+              <small className="mt-1 block text-xs font-black text-emerald-600">
                 {player.reward} &euro;
               </small>
             </span>

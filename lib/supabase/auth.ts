@@ -23,6 +23,45 @@ export async function signUpWithEmail({ pseudo, email, password }: SignUpInput) 
   });
 }
 
+export async function checkProfileAvailability({
+  pseudo,
+  email,
+}: {
+  pseudo: string;
+  email: string;
+}) {
+  if (!supabase) {
+    return {
+      data: { pseudoAvailable: true, emailAvailable: true },
+      error: null,
+    };
+  }
+
+  const result = await supabase.rpc("check_profile_availability", {
+    requested_email: email,
+    requested_pseudo: pseudo,
+  });
+
+  if (result.error) {
+    return {
+      data: { pseudoAvailable: true, emailAvailable: true },
+      error: result.error,
+    };
+  }
+
+  const availability = Array.isArray(result.data)
+    ? result.data[0]
+    : result.data;
+
+  return {
+    data: {
+      pseudoAvailable: availability?.pseudo_available !== false,
+      emailAvailable: availability?.email_available !== false,
+    },
+    error: null,
+  };
+}
+
 export async function signInWithEmail(email: string, password: string) {
   if (!supabase) {
     return {

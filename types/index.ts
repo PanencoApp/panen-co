@@ -47,6 +47,8 @@ export type MatchOption = {
   id: string;
   label: string;
   time: string;
+  homeLogo?: string;
+  awayLogo?: string;
   isPredictable?: boolean;
   scoreLabel?: string;
   statusLabel?: string;

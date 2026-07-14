@@ -16,9 +16,11 @@ type ApiFootballFixture = {
   teams?: {
     home?: {
       name?: string;
+      logo?: string;
     };
     away?: {
       name?: string;
+      logo?: string;
     };
   };
   goals?: {
@@ -126,6 +128,8 @@ function toMatch(fixture: ApiFootballFixture) {
     id: `api-football-${fixture.fixture?.id}`,
     label: `${fixture.teams?.home?.name} vs ${fixture.teams?.away?.name}`,
     time: formatKickoff(fixture.fixture?.date),
+    homeLogo: fixture.teams?.home?.logo,
+    awayLogo: fixture.teams?.away?.logo,
     isPredictable,
     scoreLabel: hasScore ? `${homeGoals}-${awayGoals}` : undefined,
     statusLabel: isPredictable

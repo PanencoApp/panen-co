@@ -474,13 +474,13 @@ export default function Home() {
       }
 
       setUserProfile({ pseudo, email, password });
-      setCurrentUserId(result.data.user?.id ?? null);
+      setCurrentUserId(result.data.session ? (result.data.user?.id ?? null) : null);
+      const todayMatches = await getTodayMatches();
+      setDailyMatches(todayMatches.data);
+      setChallengeMatch(todayMatches.data[0]?.id ?? "");
       if (result.data.user && result.data.session) {
         const dailyTokens = await getOrCreateDailyTokens(result.data.user.id);
         setTokens(dailyTokens.tokens);
-        const todayMatches = await getTodayMatches();
-        setDailyMatches(todayMatches.data);
-        setChallengeMatch(todayMatches.data[0]?.id ?? "");
         const savedPredictions = await getMyPredictions(
           result.data.user.id,
           todayMatches.data,
@@ -490,6 +490,9 @@ export default function Home() {
         setLeaderboard(weeklyPlayers);
       } else {
         setTokens(1);
+        setPredictions([]);
+        const weeklyPlayers = await getWeeklyLeaderboard(null);
+        setLeaderboard(weeklyPlayers);
       }
       setOnboardingStep("done");
       setView("home");
@@ -596,18 +599,24 @@ export default function Home() {
         {view === "home" && (
           <section className="space-y-4">
             <header className="flex items-center justify-between py-3">
-              <div>
-                <h1 className="text-4xl font-black tracking-tight">
+              <div className="min-w-0">
+                <h1 className="text-[2rem] font-black leading-tight tracking-tight">
                   Bonjour {userProfile.pseudo}
                 </h1>
               </div>
               <button
-                className="grid h-12 w-12 place-items-center rounded-full bg-white text-xl shadow-[0_12px_30px_rgba(15,23,42,.10)]"
+                className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-black shadow-[0_12px_30px_rgba(15,23,42,.10)]"
                 onClick={() => setShowProfile(true)}
                 type="button"
                 aria-label="Profil"
               >
-                ◯
+                <Image
+                  alt="Panen&Co"
+                  className="h-9 w-9 object-contain"
+                  height={36}
+                  src="/panen-co-small-logo.png"
+                  width={36}
+                />
               </button>
             </header>
 
@@ -1106,21 +1115,16 @@ function SplashScreen() {
   return (
     <main className="flex h-screen flex-col items-center justify-center overflow-hidden bg-black px-8 text-white">
       <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="grid h-36 w-36 place-items-center overflow-hidden rounded-[1.8rem] bg-black">
+        <div className="grid h-40 w-[320px] place-items-center bg-black">
           <Image
             alt="Panen&Co"
-            className="h-full w-full object-contain"
-            height={144}
+            className="h-auto w-full animate-[splash-fade_1.2s_ease-out_forwards] object-contain opacity-0"
+            height={160}
             priority
-            src="/panen-co-logo.png"
-            width={144}
+            src="/panen-co-big-logo.png"
+            width={320}
+            unoptimized
           />
-        </div>
-        <div className="mt-16 flex items-center gap-4">
-          <span className="h-4 w-4 rounded-full bg-white/20" />
-          <span className="h-4 w-4 rounded-full bg-white" />
-          <span className="h-4 w-4 rounded-full bg-white" />
-          <span className="h-4 w-4 rounded-full bg-white/20" />
         </div>
       </div>
       <div className="mb-10 h-1.5 w-full max-w-[380px] overflow-hidden rounded-full bg-white/10">
@@ -1174,17 +1178,10 @@ function Onboarding({
             <div className="pointer-events-none absolute bottom-20 left-2 h-28 w-24 rotate-[22deg] rounded-[2rem] border border-[#00baff]/10 bg-[#00baff]/[.04] blur-[3px]" />
 
             <div className="grid justify-items-center">
-              <Image
-                alt="Panen&Co"
-                className="mb-9 h-16 w-52 object-contain"
-                height={56}
-                src="/panen-co-logo.png"
-                width={208}
-              />
               <h1 className="bg-gradient-to-r from-white via-[#dcecff] to-[#00baff] bg-clip-text text-[3.25rem] font-black leading-[1.04] text-transparent">
                 Pr&eacute;dire. Grimper. R&eacute;colter.
               </h1>
-              <p className="mt-6 max-w-[330px] text-sm font-bold leading-6 text-white/70">
+              <p className="mt-5 max-w-[330px] text-sm font-bold leading-5 text-white">
                 Rejoignez plus de 500 passionn&eacute;s chaque jour,
                 int&eacute;grez le Top 100 mondial et d&eacute;bloquez les
                 r&eacute;compenses de la semaine.
@@ -1363,13 +1360,6 @@ function OnboardingConditions({ onBack }: { onBack: () => void }) {
           />
         </section>
 
-        <button
-          className="mt-auto h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black"
-          onClick={onBack}
-          type="button"
-        >
-          Retour finaliser l&apos;inscription
-        </button>
       </div>
     </main>
   );

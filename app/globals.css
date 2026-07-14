@@ -84,3 +84,15 @@ select.input option {
     transform: scaleX(1);
   }
 }
+
+@keyframes splash-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

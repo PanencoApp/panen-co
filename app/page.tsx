@@ -1644,16 +1644,32 @@ function ScorerField({ players }: { players: PlayerOption[] }) {
         ]
       : fallbackScorers;
   const featuredPlayers = players.slice(0, 6);
+  const [selectedScorer, setSelectedScorer] = useState(options[0]);
+  const selectedScorerValue = options.includes(selectedScorer)
+    ? selectedScorer
+    : options[0];
 
   return (
     <Field label="Buteur" points="2 pts">
       {featuredPlayers.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {featuredPlayers.map((player) => (
-            <div
-              className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-2 text-center"
+            <button
+              className={
+                (selectedScorerValue === player.name
+                  ? "border-[#00baff] bg-[#00baff]/10 shadow-[0_0_0_2px_rgba(0,186,255,.18)]"
+                  : "border-[#d9e1ea] bg-[#eef3f8]") +
+                " relative rounded-2xl border p-2 text-center transition"
+              }
               key={player.id}
+              onClick={() => setSelectedScorer(player.name)}
+              type="button"
             >
+              {selectedScorerValue === player.name && (
+                <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#00baff] text-xs font-black text-black">
+                  ✓
+                </span>
+              )}
               {player.photo ? (
                 <Image
                   alt={player.name}
@@ -1671,11 +1687,16 @@ function ScorerField({ players }: { players: PlayerOption[] }) {
               <span className="mt-2 block truncate text-[11px] font-black text-[#0b0f19]">
                 {player.name}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
-      <select className="input" defaultValue={options[0]} name="scorer">
+      <select
+        className="input"
+        name="scorer"
+        onChange={(event) => setSelectedScorer(event.target.value)}
+        value={selectedScorerValue}
+      >
         {options.map((scorer) => (
           <option key={scorer}>{scorer}</option>
         ))}

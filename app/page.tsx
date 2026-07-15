@@ -885,10 +885,6 @@ export default function Home() {
               <h1 className="text-center text-2xl font-black uppercase">
                 Matchs du jour
               </h1>
-              <p className="mt-2 text-center text-sm leading-6 text-[#4e596b]">
-                Place tes pr&eacute;dictions en quelques clics pour monter au
-                classement de la semaine.
-              </p>
               <div
                 className={
                   (activePredictions.length > 0
@@ -993,11 +989,6 @@ export default function Home() {
             {!selectedMatch && (
               <section className="rounded-3xl border border-[#d9e1ea] bg-white p-4">
                 <h1 className="text-2xl font-black">Choisis un match.</h1>
-                <p className="mt-2 text-sm leading-6 text-[#4e596b]">
-                  Tu peux pr&eacute;dire plusieurs matchs du jour si tu as assez
-                  de jetons. Le jeton est utilis&eacute; uniquement quand tu
-                  valides ta grille.
-                </p>
                 {dailyMatches.length > 0 ? (
                   <div className="mt-4 grid gap-2">
                     {dailyMatches.map((match) => {
@@ -1088,10 +1079,6 @@ export default function Home() {
                     ? `${activePredictions.length} pr\u00e9diction${activePredictions.length > 1 ? "s" : ""} en cours`
                     : "Nouvelle pr\u00e9diction"}
                 </h1>
-                <p className="mt-2 text-sm leading-6 text-[#4e596b]">
-                  Tu peux revenir &agrave; l&apos;accueil, rejouer un autre match si tu
-                  as des jetons, et suivre toutes tes grilles ici.
-                </p>
                 <button
                   className="mt-4 h-12 w-full rounded-2xl border border-[#00baff] font-black uppercase text-[#00baff]"
                   onClick={() => setView("home")}
@@ -1935,9 +1922,6 @@ function PredictionForm({
           Pr&eacute;dictions ouvertes
         </p>
         <h2 className="text-xl font-black">{match}</h2>
-        <p className="mt-1 text-sm font-bold text-[#5f6b7f]">
-          Grille verrouill&eacute;e apr&egrave;s validation
-        </p>
       </div>
       <form className="grid gap-3" onSubmit={onSubmit}>
         <Field label="R&eacute;sultat du match" points="1 pt">

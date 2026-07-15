@@ -5,7 +5,14 @@ export type View =
   | "prediction-active"
   | "prediction-done";
 
-export type OnboardingStep = 1 | 2 | "conditions" | "login" | "done";
+export type OnboardingStep =
+  | 1
+  | 2
+  | "conditions"
+  | "forgot-password"
+  | "login"
+  | "reset-password"
+  | "done";
 
 export type PredictionPick = {
   result: string;

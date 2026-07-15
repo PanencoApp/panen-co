@@ -17,9 +17,12 @@ import {
   checkProfileAvailability,
   getCurrentUser,
   getProfile,
+  listenForPasswordRecovery,
+  sendPasswordResetEmail,
   signInWithEmail,
   signOut,
   signUpWithEmail,
+  updatePassword,
 } from "@/lib/supabase/auth";
 import {
   addAdToken,
@@ -158,6 +161,14 @@ export default function Home() {
 
     navigator.serviceWorker.register("/sw.js").catch(() => {
       // Panen&Co reste utilisable si le navigateur refuse le service worker.
+    });
+  }, []);
+
+  useEffect(() => {
+    return listenForPasswordRecovery(() => {
+      setShowSplash(false);
+      setAuthBusy(false);
+      setOnboardingStep("reset-password");
     });
   }, []);
 
@@ -686,6 +697,67 @@ export default function Home() {
     }
   }
 
+  async function requestPasswordReset(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") || "").trim();
+
+    if (!email) {
+      window.alert("Entre ton email pour recevoir le lien de réinitialisation.");
+      return;
+    }
+
+    setAuthBusy(true);
+
+    try {
+      const result = await sendPasswordResetEmail(email, window.location.origin);
+
+      if (result.error) {
+        window.alert(result.error.message);
+        return;
+      }
+
+      window.alert("Email envoyé. Ouvre le lien reçu pour choisir un nouveau mot de passe.");
+      setOnboardingStep("login");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function submitNewPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const password = String(form.get("password") || "");
+    const confirmPassword = String(form.get("confirmPassword") || "");
+
+    if (password.length < 6) {
+      window.alert("Ton mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      window.alert("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setAuthBusy(true);
+
+    try {
+      const result = await updatePassword(password);
+
+      if (result.error) {
+        window.alert(result.error.message);
+        return;
+      }
+
+      await signOut();
+      window.alert("Mot de passe modifié. Tu peux te reconnecter.");
+      setOnboardingStep("login");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
   async function logout() {
     await signOut();
     setShowProfile(false);
@@ -706,8 +778,28 @@ export default function Home() {
       return (
         <LoginScreen
           isBusy={authBusy}
+          onForgotPassword={() => setOnboardingStep("forgot-password")}
           onLogin={login}
           onRegister={() => setOnboardingStep(2)}
+        />
+      );
+    }
+
+    if (onboardingStep === "forgot-password") {
+      return (
+        <ForgotPasswordScreen
+          isBusy={authBusy}
+          onBack={() => setOnboardingStep("login")}
+          onSubmit={requestPasswordReset}
+        />
+      );
+    }
+
+    if (onboardingStep === "reset-password") {
+      return (
+        <ResetPasswordScreen
+          isBusy={authBusy}
+          onSubmit={submitNewPassword}
         />
       );
     }
@@ -1570,10 +1662,12 @@ function OnboardingConditions({ onBack }: { onBack: () => void }) {
 
 function LoginScreen({
   isBusy,
+  onForgotPassword,
   onLogin,
   onRegister,
 }: {
   isBusy: boolean;
+  onForgotPassword: () => void;
   onLogin: (event: React.FormEvent<HTMLFormElement>) => void;
   onRegister: () => void;
 }) {
@@ -1613,12 +1707,121 @@ function LoginScreen({
             </button>
           </form>
           <button
-            className="mt-4 w-full text-sm font-black text-[#00baff]"
+            className="mt-4 w-full text-sm font-black text-[#4e596b]"
+            onClick={onForgotPassword}
+            type="button"
+          >
+            Mot de passe oublié ?
+          </button>
+          <button
+            className="mt-3 w-full text-sm font-black text-[#00baff]"
             onClick={onRegister}
             type="button"
           >
             Pas encore inscrit ? Creer un compte
           </button>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function ForgotPasswordScreen({
+  isBusy,
+  onBack,
+  onSubmit,
+}: {
+  isBusy: boolean;
+  onBack: () => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <main className="min-h-screen bg-[#eef3f8] text-[#05070d]">
+      <div className="mx-auto flex min-h-screen w-full max-w-[500px] flex-col justify-center px-5 py-8">
+        <section className="rounded-[2rem] border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.1)]">
+          <button
+            className="mb-5 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] px-4 py-2 text-sm font-black"
+            onClick={onBack}
+            type="button"
+          >
+            &larr; Retour
+          </button>
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-[#00baff]">
+            Sécurité
+          </p>
+          <h1 className="mt-3 text-3xl font-black leading-tight">
+            Mot de passe oublié
+          </h1>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#4e596b]">
+            Entre l&apos;email de ton compte. On t&apos;envoie un lien sécurisé
+            pour choisir un nouveau mot de passe.
+          </p>
+          <form className="mt-5 grid gap-3" onSubmit={onSubmit}>
+            <input
+              className="input"
+              name="email"
+              placeholder="Email"
+              required
+              type="email"
+            />
+            <button
+              className="mt-2 h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black disabled:opacity-50"
+              disabled={isBusy}
+            >
+              {isBusy ? "Envoi..." : "Recevoir le lien"}
+            </button>
+          </form>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function ResetPasswordScreen({
+  isBusy,
+  onSubmit,
+}: {
+  isBusy: boolean;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <main className="min-h-screen bg-[#eef3f8] text-[#05070d]">
+      <div className="mx-auto flex min-h-screen w-full max-w-[500px] flex-col justify-center px-5 py-8">
+        <section className="rounded-[2rem] border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.1)]">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-[#00baff]">
+            Sécurité
+          </p>
+          <h1 className="mt-3 text-3xl font-black leading-tight">
+            Nouveau mot de passe
+          </h1>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#4e596b]">
+            Choisis un mot de passe solide. Une fois validé, tu pourras te
+            reconnecter normalement.
+          </p>
+          <form className="mt-5 grid gap-3" onSubmit={onSubmit}>
+            <input
+              className="input"
+              minLength={6}
+              name="password"
+              placeholder="Nouveau mot de passe"
+              required
+              type="password"
+            />
+            <input
+              className="input"
+              minLength={6}
+              name="confirmPassword"
+              placeholder="Confirmer le mot de passe"
+              required
+              type="password"
+            />
+            <button
+              className="mt-2 h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black disabled:opacity-50"
+              disabled={isBusy}
+            >
+              {isBusy ? "Modification..." : "Valider"}
+            </button>
+          </form>
         </section>
       </div>
     </main>

@@ -73,6 +73,44 @@ export async function signInWithEmail(email: string, password: string) {
   return supabase.auth.signInWithPassword({ email, password });
 }
 
+export async function sendPasswordResetEmail(email: string, redirectTo: string) {
+  if (!supabase) {
+    return {
+      data: null,
+      error: new Error("Supabase n'est pas encore configuré."),
+    };
+  }
+
+  return supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+}
+
+export async function updatePassword(password: string) {
+  if (!supabase) {
+    return {
+      data: null,
+      error: new Error("Supabase n'est pas encore configuré."),
+    };
+  }
+
+  return supabase.auth.updateUser({ password });
+}
+
+export function listenForPasswordRecovery(onRecovery: () => void) {
+  if (!supabase) return () => undefined;
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY") {
+      onRecovery();
+    }
+  });
+
+  return () => subscription.unsubscribe();
+}
+
 export async function signOut() {
   if (!supabase) return;
   await supabase.auth.signOut();

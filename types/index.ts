@@ -47,11 +47,23 @@ export type MatchOption = {
   id: string;
   label: string;
   time: string;
+  homeTeamId?: number;
+  awayTeamId?: number;
+  homeTeamName?: string;
+  awayTeamName?: string;
   homeLogo?: string;
   awayLogo?: string;
   isPredictable?: boolean;
   scoreLabel?: string;
   statusLabel?: string;
+};
+
+export type PlayerOption = {
+  id: number;
+  name: string;
+  photo?: string;
+  position?: string;
+  team: "home" | "away";
 };
 
 export type TopPlayer = {

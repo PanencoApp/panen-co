@@ -1,4 +1,9 @@
-import type { MatchOption, PredictionPick, PredictionRecord } from "@/types";
+import type {
+  MatchOption,
+  PredictionPick,
+  PredictionRecord,
+  ScoreLine,
+} from "@/types";
 import { supabase } from "@/lib/supabase/client";
 
 type MatchRow = {
@@ -21,6 +26,7 @@ type PredictionRow = {
   goals_pick: string;
   status: string;
   points: number;
+  score_details: ScoreLine[] | null;
   matches: MatchRow | MatchRow[] | null;
 };
 
@@ -88,6 +94,9 @@ function toPredictionRecord(
     },
     status: row.status === "done" ? "done" : "active",
     score: row.status === "done" ? row.points : undefined,
+    scoreDetails: Array.isArray(row.score_details)
+      ? row.score_details
+      : undefined,
   };
 }
 
@@ -137,7 +146,7 @@ export async function getMyPredictions(
   const result = await supabase
     .from("predictions")
     .select(
-      "id, match_id, created_at, result_pick, scorer_pick, exact_score_pick, first_team_pick, last_team_pick, goals_pick, status, points, matches(id, external_id, home_team, away_team, kickoff_at)",
+      "id, match_id, created_at, result_pick, scorer_pick, exact_score_pick, first_team_pick, last_team_pick, goals_pick, status, points, score_details, matches(id, external_id, home_team, away_team, kickoff_at)",
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
@@ -199,7 +208,7 @@ export async function savePrediction({
       points: 0,
     })
     .select(
-      "id, match_id, created_at, result_pick, scorer_pick, exact_score_pick, first_team_pick, last_team_pick, goals_pick, status, points, matches(id, external_id, home_team, away_team, kickoff_at)",
+      "id, match_id, created_at, result_pick, scorer_pick, exact_score_pick, first_team_pick, last_team_pick, goals_pick, status, points, score_details, matches(id, external_id, home_team, away_team, kickoff_at)",
     )
     .single();
 
@@ -229,10 +238,12 @@ export async function savePrediction({
 export async function finishPredictionDemoInSupabase({
   predictionId,
   score,
+  scoreDetails,
   matchOptions,
 }: {
   predictionId: string;
   score: number;
+  scoreDetails: ScoreLine[];
   matchOptions: MatchOption[];
 }): Promise<PredictionResult> {
   if (!supabase) {
@@ -244,10 +255,10 @@ export async function finishPredictionDemoInSupabase({
 
   const result = await supabase
     .from("predictions")
-    .update({ status: "done", points: score })
+    .update({ status: "done", points: score, score_details: scoreDetails })
     .eq("id", predictionId)
     .select(
-      "id, match_id, created_at, result_pick, scorer_pick, exact_score_pick, first_team_pick, last_team_pick, goals_pick, status, points, matches(id, external_id, home_team, away_team, kickoff_at)",
+      "id, match_id, created_at, result_pick, scorer_pick, exact_score_pick, first_team_pick, last_team_pick, goals_pick, status, points, score_details, matches(id, external_id, home_team, away_team, kickoff_at)",
     )
     .single();
 

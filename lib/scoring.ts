@@ -72,7 +72,7 @@ export function calculatePredictionScore(
 ) {
   const details: ScoreLine[] = [
     scoreLine({
-      label: "Resultat 1N2",
+      label: "Résultat 1N2",
       maxPoints: 1,
       won: isSameChoice(pick.result, expectedResult(result)),
     }),
@@ -87,12 +87,12 @@ export function calculatePredictionScore(
       won: isSameChoice(pick.exactScore, exactScore(result)),
     }),
     scoreLine({
-      label: "Premiere equipe",
+      label: "Première équipe",
       maxPoints: 1,
       won: isSameChoice(pick.firstTeam, result.firstTeam),
     }),
     scoreLine({
-      label: "Derniere equipe",
+      label: "Dernière équipe",
       maxPoints: 1,
       won: isSameChoice(pick.lastTeam, result.lastTeam),
     }),

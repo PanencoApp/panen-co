@@ -52,8 +52,12 @@ function toMatchOption(row: MatchRow, fallbackMatches: MatchOption[]) {
 
   return {
     id: row.external_id ?? row.id,
-    label: `${row.home_team} vs ${row.away_team}`,
+    label: fallback?.label ?? `${row.home_team} vs ${row.away_team}`,
     time: formatMatchTime(row.kickoff_at, fallback?.time),
+    homeTeamId: fallback?.homeTeamId,
+    awayTeamId: fallback?.awayTeamId,
+    homeTeamName: fallback?.homeTeamName,
+    awayTeamName: fallback?.awayTeamName,
     homeLogo: fallback?.homeLogo,
     awayLogo: fallback?.awayLogo,
     isPredictable: fallback?.isPredictable ?? true,

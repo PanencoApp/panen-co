@@ -15,10 +15,12 @@ type ApiFootballFixture = {
   };
   teams?: {
     home?: {
+      id?: number;
       name?: string;
       logo?: string;
     };
     away?: {
+      id?: number;
       name?: string;
       logo?: string;
     };
@@ -127,6 +129,26 @@ const teamPriority: Array<[RegExp, number]> = [
   [/uruguay/i, 6],
 ];
 
+const teamTranslations = new Map<string, string>([
+  ["argentina", "Argentine"],
+  ["england", "Angleterre"],
+  ["spain", "Espagne"],
+  ["germany", "Allemagne"],
+  ["italy", "Italie"],
+  ["brazil", "Brésil"],
+  ["netherlands", "Pays-Bas"],
+  ["belgium", "Belgique"],
+  ["mexico", "Mexique"],
+  ["united states", "États-Unis"],
+  ["usa", "États-Unis"],
+]);
+
+function translateTeam(name?: string) {
+  if (!name) return "Équipe";
+
+  return teamTranslations.get(name.trim().toLowerCase()) ?? name;
+}
+
 function todayKey() {
   const parts = new Intl.DateTimeFormat("fr-CA", {
     day: "2-digit",
@@ -202,8 +224,12 @@ function toMatch(fixture: ApiFootballFixture) {
 
   return {
     id: `api-football-${fixture.fixture?.id}`,
-    label: `${fixture.teams?.home?.name} vs ${fixture.teams?.away?.name}`,
+    label: `${translateTeam(fixture.teams?.home?.name)} vs ${translateTeam(fixture.teams?.away?.name)}`,
     time: formatKickoff(fixture.fixture?.date),
+    homeTeamId: fixture.teams?.home?.id,
+    awayTeamId: fixture.teams?.away?.id,
+    homeTeamName: translateTeam(fixture.teams?.home?.name),
+    awayTeamName: translateTeam(fixture.teams?.away?.name),
     homeLogo: fixture.teams?.home?.logo,
     awayLogo: fixture.teams?.away?.logo,
     isPredictable,

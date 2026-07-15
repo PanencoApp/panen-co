@@ -260,10 +260,14 @@ export async function GET(request: NextRequest) {
 
     if (!result) continue;
 
-    const score = calculatePredictionScore(pickFromPrediction(row), result).total;
+    const scoring = calculatePredictionScore(pickFromPrediction(row), result);
     const updated = await serverSupabase
       .from("predictions")
-      .update({ points: score, status: "done" })
+      .update({
+        points: scoring.total,
+        score_details: scoring.details,
+        status: "done",
+      })
       .eq("id", row.id)
       .eq("status", "active")
       .select("id")
@@ -273,7 +277,7 @@ export async function GET(request: NextRequest) {
 
     settled += 1;
     await addWeeklyPoints({
-      points: score,
+      points: scoring.total,
       pseudo: getPseudo(row),
       userId: row.user_id,
     });

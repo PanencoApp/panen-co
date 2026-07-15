@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   defaultProfile,
-  scorerOptions,
   weeklyRank,
 } from "@/lib/demo-data";
 import {
@@ -40,6 +39,7 @@ import {
 import type {
   MatchOption,
   OnboardingStep,
+  PlayerOption,
   PredictionPick,
   PredictionRecord,
   TopPlayer,
@@ -61,6 +61,29 @@ function parisDayKey(date: string | Date) {
   return `${year}-${month}-${day}`;
 }
 
+const exactScoreOptions = [
+  {
+    label: "Domicile",
+    scores: ["1-0", "2-0", "2-1", "3-0", "3-1", "3-2", "4-0", "4-1", "4-2", "4-3"],
+  },
+  {
+    label: "Nul",
+    scores: ["0-0", "1-1", "2-2", "3-3", "4-4"],
+  },
+  {
+    label: "Extérieur",
+    scores: ["0-1", "0-2", "1-2", "0-3", "1-3", "2-3", "0-4", "1-4", "2-4", "3-4"],
+  },
+  {
+    label: "Autre",
+    scores: ["Autres"],
+  },
+];
+
+function exactScoreLabel(score: string) {
+  return score === "Autres" ? score : score.replace("-", " - ");
+}
+
 export default function Home() {
   const [showSplash, setShowSplash] = useState(true);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(1);
@@ -68,6 +91,8 @@ export default function Home() {
   const [tokens, setTokens] = useState(1);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
   const [dailyMatches, setDailyMatches] = useState<MatchOption[]>([]);
+  const [matchPlayers, setMatchPlayers] = useState<PlayerOption[]>([]);
+  const [challengePlayers, setChallengePlayers] = useState<PlayerOption[]>([]);
   const [predictions, setPredictions] = useState<PredictionRecord[]>([]);
   const [leaderboard, setLeaderboard] = useState<TopPlayer[]>([]);
   const [challengeMatch, setChallengeMatch] = useState("");
@@ -84,6 +109,7 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+  const [resultsSeenToday, setResultsSeenToday] = useState(false);
 
   const selected = useMemo(
     () => dailyMatches.find((match) => match.id === selectedMatch),
@@ -111,7 +137,20 @@ export default function Home() {
     const referenceDate = prediction.matchDate ?? prediction.createdAt;
     return referenceDate ? parisDayKey(referenceDate) === parisDayKey(new Date()) : false;
   });
+  const homeDonePredictions = resultsSeenToday ? [] : todayDonePredictions;
+  const pastDonePredictions = donePredictions.filter((prediction) => {
+    const referenceDate = prediction.matchDate ?? prediction.createdAt;
+    return referenceDate ? parisDayKey(referenceDate) !== parisDayKey(new Date()) : false;
+  });
+  const visibleDonePredictions =
+    todayDonePredictions.length > 0 ? todayDonePredictions : pastDonePredictions;
   const usedMatchIds = predictions.map((prediction) => prediction.matchId);
+  const doneDayTotal = visibleDonePredictions.reduce(
+    (sum, prediction) => sum + (prediction.score ?? 0),
+    0,
+  );
+  const updatedWeeklyRank =
+    leaderboard.find((player) => player.isCurrentUser)?.rank ?? weeklyRank;
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -121,6 +160,45 @@ export default function Home() {
       // Panen&Co reste utilisable si le navigateur refuse le service worker.
     });
   }, []);
+
+  async function loadPlayers(match: MatchOption | null) {
+    if (!match?.homeTeamId || !match.awayTeamId) return [];
+
+    try {
+      const response = await fetch(
+        `/api/match-players?homeTeamId=${match.homeTeamId}&awayTeamId=${match.awayTeamId}`,
+      );
+      const payload = (await response.json()) as { players?: PlayerOption[] };
+
+      return payload.players ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadPlayers(selected ?? null).then((players) => {
+      if (!cancelled) setMatchPlayers(players);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadPlayers(selectedChallenge).then((players) => {
+      if (!cancelled) setChallengePlayers(players);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChallenge]);
 
   useEffect(() => {
     let isMounted = true;
@@ -177,8 +255,24 @@ export default function Home() {
         if (isMounted) setPredictions(savedPredictions.data);
         const weeklyPlayers = await getWeeklyLeaderboard(user.id);
         if (isMounted) setLeaderboard(weeklyPlayers);
+        const todayKey = parisDayKey(new Date());
+        const hasPastDoneResults = savedPredictions.data.some((prediction) => {
+          const referenceDate = prediction.matchDate ?? prediction.createdAt;
+          return (
+            prediction.status === "done" &&
+            referenceDate &&
+            parisDayKey(referenceDate) !== todayKey
+          );
+        });
+        const seenResultsKey = `panen-co-results-seen-${todayKey}`;
+        const hasSeenResultsToday = window.localStorage.getItem(seenResultsKey) === "yes";
+        setResultsSeenToday(hasSeenResultsToday);
         setOnboardingStep("done");
-        setView("home");
+        setView(
+          hasPastDoneResults && !hasSeenResultsToday
+            ? "prediction-done"
+            : "home",
+        );
       } finally {
         if (isMounted) setShowSplash(false);
       }
@@ -225,7 +319,7 @@ export default function Home() {
     }
 
     const confirmed = window.confirm(
-      "Tu es sur de tes predictions ? Une fois validees, elles seront verrouillees et 1 jeton sera utilise.",
+      "Tu es sûr de tes prédictions ? Une fois validées, elles seront verrouillées et 1 jeton sera utilisé.",
     );
 
     if (!confirmed) return;
@@ -298,7 +392,7 @@ export default function Home() {
 
     if (!prediction.matchId.startsWith("api-football-")) {
       if (!options?.silent) {
-        window.alert("Ce match ne vient pas de l'API, le resultat automatique est indisponible.");
+        window.alert("Ce match ne vient pas de l'API, le résultat automatique est indisponible.");
       }
       return;
     }
@@ -314,8 +408,8 @@ export default function Home() {
       if (!options?.silent) {
         window.alert(
           payload.status === "error"
-            ? (payload.message ?? "Impossible de recuperer le resultat.")
-            : "Impossible de recuperer le resultat.",
+            ? (payload.message ?? "Impossible de récupérer le résultat.")
+            : "Impossible de récupérer le résultat.",
         );
       }
       return;
@@ -324,7 +418,7 @@ export default function Home() {
     if (payload.status === "not_finished") {
       if (!options?.silent) {
         window.alert(
-          "Ce match n'est pas encore termine. Les points seront calcules apres le coup de sifflet final.",
+          "Ce match n'est pas encore terminé. Les points seront calculés après le coup de sifflet final.",
         );
       }
       return;
@@ -336,6 +430,7 @@ export default function Home() {
       const saved = await finishPredictionDemoInSupabase({
         predictionId: id,
         score: scoring.total,
+        scoreDetails: scoring.details,
         matchOptions: dailyMatches,
       });
 
@@ -407,7 +502,29 @@ export default function Home() {
   }, [currentUserId, predictions, resolvePredictionResult]);
 
   function resetAfterResult() {
+    window.localStorage.setItem(`panen-co-results-seen-${parisDayKey(new Date())}`, "yes");
+    setResultsSeenToday(true);
     setView("home");
+  }
+
+  async function sharePredictionResults() {
+    const text = `Panen&Co : ${doneDayTotal} point${doneDayTotal > 1 ? "s" : ""} récolté${doneDayTotal > 1 ? "s" : ""} aujourd'hui. Rang semaine : ${updatedWeeklyRank}.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          text,
+          title: "Résultats Panen&Co",
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(text);
+      window.alert("Résultat copié, prêt à partager.");
+    } catch {
+      await navigator.clipboard.writeText(text);
+      window.alert("Résultat copié, prêt à partager.");
+    }
   }
 
   async function copyChallengeLink() {
@@ -684,7 +801,7 @@ export default function Home() {
                 className={
                   (activePredictions.length > 0
                     ? "border-[#00baff]/70 bg-[#00baff]/10 text-[#00baff]"
-                    : todayDonePredictions.length > 0
+                    : homeDonePredictions.length > 0
                       ? "border-green-400/60 bg-green-400/10 text-green-300"
                     : "border-[#d9e1ea] bg-white text-[#4e596b]") +
                   " my-4 rounded-2xl border px-3 py-3 text-sm font-black"
@@ -692,8 +809,8 @@ export default function Home() {
               >
                 {activePredictions.length > 0
                   ? `${activePredictions.length} pr\u00e9diction${activePredictions.length > 1 ? "s" : ""} en cours`
-                  : todayDonePredictions.length > 0
-                    ? `${todayDonePredictions.length} pr\u00e9diction${todayDonePredictions.length > 1 ? "s" : ""} termin\u00e9e${todayDonePredictions.length > 1 ? "s" : ""}`
+                  : homeDonePredictions.length > 0
+                    ? `${homeDonePredictions.length} pr\u00e9diction${homeDonePredictions.length > 1 ? "s" : ""} termin\u00e9e${homeDonePredictions.length > 1 ? "s" : ""}`
                     : mainMatch
                       ? <HomeMatchPreview match={mainMatch} matchCount={dailyMatches.length} />
                       : "Match principal bient\u00f4t disponible"}
@@ -714,7 +831,7 @@ export default function Home() {
                   Voir mes pr&eacute;dictions
                 </button>
               )}
-              {activePredictions.length === 0 && todayDonePredictions.length > 0 && (
+              {activePredictions.length === 0 && homeDonePredictions.length > 0 && (
                 <button
                   className="mt-3 h-12 w-full rounded-2xl border border-green-400 font-black uppercase text-green-300"
                   onClick={() => setView("prediction-done")}
@@ -813,11 +930,11 @@ export default function Home() {
                             <strong className="block">{match.label}</strong>
                             <small className="text-[#5f6b7f]">{match.time}</small>
                           </span>
-                          <b className="text-sm text-[#00baff]">
+                          <b className="max-w-[136px] text-right text-xs leading-4 text-[#00baff] sm:max-w-[180px]">
                             {used
-                              ? "D&eacute;j&agrave; jou&eacute;"
+                              ? "Prédictions déjà effectuées."
                               : match.isPredictable === false
-                                ? (match.scoreLabel ?? match.statusLabel ?? "Verrouill&eacute;")
+                                ? "Prédictions clôturées, le match est en cours ou terminé"
                                 : "1 jeton"}
                           </b>
                         </button>
@@ -845,7 +962,7 @@ export default function Home() {
                 <p className="text-xs font-black uppercase text-[#00baff]">
                   Match s&eacute;lectionn&eacute;
                 </p>
-                <h2 className="mt-1 text-xl font-black">FC {selected?.label}</h2>
+                <h2 className="mt-1 text-xl font-black">{selected?.label}</h2>
                 <p className="mt-1 text-sm text-[#5f6b7f]">
                   {selected?.time} · pr&eacute;dictions ouvertes
                 </p>
@@ -896,15 +1013,16 @@ export default function Home() {
             {selectedMatch && selected ? (
               <PredictionForm
                 match={selected.label}
+                matchOption={selected}
                 onBack={changeMatch}
                 onSubmit={submitPrediction}
+                players={matchPlayers}
               />
             ) : activePredictions.length > 0 ? (
               <div className="grid gap-3">
                 {activePredictions.map((prediction) => (
                   <SubmittedPredictionCard
                     key={prediction.id}
-                    onFinishMatch={() => resolvePredictionResult(prediction.id)}
                     prediction={prediction}
                   />
                 ))}
@@ -950,10 +1068,10 @@ export default function Home() {
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-4">
                   <span className="text-xs font-black uppercase text-[#5f6b7f]">
-                    Meilleur score
+                    Total journée
                   </span>
                   <strong className="mt-2 block text-5xl font-black text-[#00baff] drop-shadow-[0_0_18px_rgba(0,186,255,.65)]">
-                    {Math.max(...todayDonePredictions.map((prediction) => prediction.score ?? 0), 0)}
+                    {doneDayTotal}
                   </strong>
                 </div>
                 <div className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-4">
@@ -961,7 +1079,7 @@ export default function Home() {
                     Rang semaine
                   </span>
                   <strong className="mt-2 block text-5xl font-black text-[#00baff] drop-shadow-[0_0_18px_rgba(0,186,255,.65)]">
-                    #{weeklyRank}
+                    {updatedWeeklyRank}
                   </strong>
                 </div>
               </div>
@@ -972,7 +1090,7 @@ export default function Home() {
             </section>
 
             <div className="grid gap-3">
-              {todayDonePredictions.map((prediction) => (
+              {visibleDonePredictions.map((prediction) => (
                 <ResultPredictionCard
                   key={prediction.id}
                   prediction={prediction}
@@ -982,6 +1100,14 @@ export default function Home() {
 
             <button
               className="h-12 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black"
+              onClick={sharePredictionResults}
+              type="button"
+            >
+              Partager
+            </button>
+
+            <button
+              className="h-12 w-full rounded-2xl border border-[#d9e1ea] bg-white font-black uppercase text-[#101522]"
               onClick={resetAfterResult}
               type="button"
             >
@@ -1054,8 +1180,10 @@ export default function Home() {
             {challengeStep === "predict" && (
               <ChallengePredictionForm
                 match={selectedChallenge.label}
+                matchOption={selectedChallenge}
                 onBack={() => setChallengeStep("setup")}
                 onSubmit={submitChallengePrediction}
+                players={challengePlayers}
                 submitLabel="Generer mon lien"
                 title="Mes predictions"
               />
@@ -1086,9 +1214,11 @@ export default function Home() {
                   playerPick={challengePick}
                 />
                 <ChallengePredictionForm
-                  match={challengeFriendPseudo}
+                  match={selectedChallenge.label}
+                  matchOption={selectedChallenge}
                   onBack={() => setChallengeStep("share")}
                   onSubmit={submitFriendPrediction}
+                  players={challengePlayers}
                   submitLabel="Valider les predictions ami"
                   title={`Predictions de ${challengeFriendPseudo}`}
                 />
@@ -1495,17 +1625,80 @@ function LoginScreen({
   );
 }
 
+const fallbackScorers = [
+  "Kylian Mbappé",
+  "Vinícius Júnior",
+  "Jude Bellingham",
+  "Harry Kane",
+  "Erling Haaland",
+  "Aucun buteur",
+];
+
+function ScorerField({ players }: { players: PlayerOption[] }) {
+  const options =
+    players.length > 0
+      ? [
+          ...players.map((player) => player.name),
+          "Aucun buteur",
+          "Autre buteur",
+        ]
+      : fallbackScorers;
+  const featuredPlayers = players.slice(0, 6);
+
+  return (
+    <Field label="Buteur" points="2 pts">
+      {featuredPlayers.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {featuredPlayers.map((player) => (
+            <div
+              className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-2 text-center"
+              key={player.id}
+            >
+              {player.photo ? (
+                <Image
+                  alt={player.name}
+                  className="mx-auto h-12 w-12 rounded-full object-cover"
+                  height={48}
+                  src={player.photo}
+                  unoptimized
+                  width={48}
+                />
+              ) : (
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white text-xs font-black text-[#00baff]">
+                  {player.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <span className="mt-2 block truncate text-[11px] font-black text-[#0b0f19]">
+                {player.name}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <select className="input" defaultValue={options[0]} name="scorer">
+        {options.map((scorer) => (
+          <option key={scorer}>{scorer}</option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
 function PredictionForm({
   match,
+  matchOption,
+  players,
   onBack,
   onSubmit,
 }: {
   match: string;
+  matchOption: MatchOption;
+  players: PlayerOption[];
   onBack: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <section className="rounded-3xl border border-[#d9e1ea] bg-white p-4">
+    <section className="rounded-3xl border border-[#d9e1ea] bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,.10)]">
       <button
         className="mb-3 rounded-xl border border-[#00baff]/50 px-3 py-2 text-sm font-black text-[#00baff]"
         onClick={onBack}
@@ -1518,35 +1711,42 @@ function PredictionForm({
           Pr&eacute;dictions ouvertes
         </p>
         <h2 className="text-xl font-black">{match}</h2>
+        <p className="mt-1 text-sm font-bold text-[#5f6b7f]">
+          Grille verrouill&eacute;e apr&egrave;s validation
+        </p>
       </div>
       <form className="grid gap-3" onSubmit={onSubmit}>
-        <Field label="R&eacute;sultat 1N2" points="1 pt">
+        <Field label="R&eacute;sultat du match" points="1 pt">
           <select className="input" name="result">
             <option>Victoire domicile</option>
             <option>Nul</option>
             <option>Victoire exterieur</option>
           </select>
         </Field>
-        <Field label="Buteur" points="2 pts">
-          <select className="input" defaultValue="Kylian Mbappe" name="scorer">
-            {scorerOptions.map((scorer) => (
-              <option key={scorer}>{scorer}</option>
+        <ScorerField players={players} />
+        <Field label="Score exact" points="3 pts">
+          <select className="input" defaultValue="2-1" name="exactScore">
+            {exactScoreOptions.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.scores.map((score) => (
+                  <option key={score} value={score}>{exactScoreLabel(score)}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </Field>
-        <Field label="Score exact" points="3 pts">
-          <input className="input" defaultValue="2-1" name="exactScore" />
-        </Field>
         <Field label="Premi&egrave;re &eacute;quipe &agrave; marquer" points="1 pt">
           <select className="input" name="firstTeam">
-            <option>Domicile</option>
-            <option>Exterieur</option>
+            <option value="Domicile">{matchOption.homeTeamName ?? "Domicile"}</option>
+            <option value="Exterieur">{matchOption.awayTeamName ?? "Extérieur"}</option>
+            <option value="Aucun">Aucun but</option>
           </select>
         </Field>
         <Field label="Derni&egrave;re &eacute;quipe &agrave; marquer" points="1 pt">
           <select className="input" name="lastTeam">
-            <option>Exterieur</option>
-            <option>Domicile</option>
+            <option value="Exterieur">{matchOption.awayTeamName ?? "Extérieur"}</option>
+            <option value="Domicile">{matchOption.homeTeamName ?? "Domicile"}</option>
+            <option value="Aucun">Aucun but</option>
           </select>
         </Field>
         <Field label="Total buts" points="1 pt">
@@ -1556,8 +1756,8 @@ function PredictionForm({
           </select>
         </Field>
         <p className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-xs font-bold leading-5 text-[#4e596b]">
-          A la validation, 1 jeton sera utilise et tes predictions seront
-          verrouillees.
+          &Agrave; la validation, 1 jeton sera utilis&eacute; et tes
+          pr&eacute;dictions seront verrouill&eacute;es.
         </p>
         <button className="h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black">
           Valider mes pr&eacute;dictions
@@ -1569,10 +1769,8 @@ function PredictionForm({
 
 function SubmittedPredictionCard({
   prediction,
-  onFinishMatch,
 }: {
   prediction: PredictionRecord;
-  onFinishMatch: () => void;
 }) {
   return (
     <section className="rounded-3xl border border-[#d9e1ea] bg-white p-4">
@@ -1580,37 +1778,31 @@ function SubmittedPredictionCard({
         <p className="text-xs font-black uppercase text-[#00baff]">
           Grille enregistr&eacute;e
         </p>
-        <h2 className="mt-1 text-xl font-black">FC {prediction.matchLabel}</h2>
-        <p className="mt-1 text-sm text-[#5f6b7f]">
-          {prediction.matchTime} · en attente du r&eacute;sultat
+        <h2 className="mt-1 text-xl font-black">{prediction.matchLabel}</h2>
+        <p className="mt-2 inline-flex rounded-full bg-[#00baff] px-3 py-1 text-xs font-black uppercase text-black">
+          En attente de r&eacute;sultat
+        </p>
+        <p className="mt-2 text-sm text-[#5f6b7f]">
+          {prediction.matchTime}
         </p>
       </div>
       <PredictionDetails pick={prediction.pick} />
-      <p className="mt-4 rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-sm font-bold text-[#4e596b]">
-        Prediction validee : la grille est verrouillee et le jeton a ete
-        utilise.
-      </p>
-      <div className="mt-4 grid gap-3">
-        <button
-          className="h-12 rounded-2xl bg-green-400 font-black uppercase text-black"
-          onClick={onFinishMatch}
-          type="button"
-        >
-          Verifier le resultat
-        </button>
-      </div>
     </section>
   );
 }
 
 function ChallengePredictionForm({
   match,
+  matchOption,
+  players,
   title,
   submitLabel,
   onBack,
   onSubmit,
 }: {
   match: string;
+  matchOption: MatchOption;
+  players: PlayerOption[];
   title: string;
   submitLabel: string;
   onBack: () => void;
@@ -1639,26 +1831,30 @@ function ChallengePredictionForm({
             <option>Victoire exterieur</option>
           </select>
         </Field>
-        <Field label="Buteur" points="2 pts">
-          <select className="input" defaultValue="Kylian Mbappe" name="scorer">
-            {scorerOptions.map((scorer) => (
-              <option key={scorer}>{scorer}</option>
+        <ScorerField players={players} />
+        <Field label="Score exact" points="3 pts">
+          <select className="input" defaultValue="2-1" name="exactScore">
+            {exactScoreOptions.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.scores.map((score) => (
+                  <option key={score} value={score}>{exactScoreLabel(score)}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </Field>
-        <Field label="Score exact" points="3 pts">
-          <input className="input" defaultValue="2-1" name="exactScore" />
-        </Field>
         <Field label="Premi&egrave;re &eacute;quipe &agrave; marquer" points="1 pt">
           <select className="input" name="firstTeam">
-            <option>Domicile</option>
-            <option>Exterieur</option>
+            <option value="Domicile">{matchOption.homeTeamName ?? "Domicile"}</option>
+            <option value="Exterieur">{matchOption.awayTeamName ?? "Extérieur"}</option>
+            <option value="Aucun">Aucun but</option>
           </select>
         </Field>
         <Field label="Derni&egrave;re &eacute;quipe &agrave; marquer" points="1 pt">
           <select className="input" name="lastTeam">
-            <option>Exterieur</option>
-            <option>Domicile</option>
+            <option value="Exterieur">{matchOption.awayTeamName ?? "Extérieur"}</option>
+            <option value="Domicile">{matchOption.homeTeamName ?? "Domicile"}</option>
+            <option value="Aucun">Aucun but</option>
           </select>
         </Field>
         <Field label="Total buts" points="1 pt">
@@ -1762,14 +1958,14 @@ function ChallengeResultCard({
     friendScore > adminScore
       ? `admin te doit ${stakeText}.`
       : `Tu dois ${stakeText} a admin.`;
-  const shareText = `${winnerText} Resultat du defi Panen&Co sur ${matchLabel} : admin ${adminScore} pts, ${friendPseudo} ${friendScore} pts.`;
+  const shareText = `${winnerText} Résultat du défi Panen&Co sur ${matchLabel} : admin ${adminScore} pts, ${friendPseudo} ${friendScore} pts.`;
 
   async function shareResult() {
     try {
       if (navigator.share) {
         await navigator.share({
           text: shareText,
-          title: "Resultat du defi Panen&Co",
+          title: "Résultat du défi Panen&Co",
         });
       } else {
         await navigator.clipboard.writeText(shareText);
@@ -1816,7 +2012,7 @@ function ChallengeResultCard({
           onClick={shareResult}
           type="button"
         >
-          {resultCopied ? "Resultat copie" : "Partager"}
+          {resultCopied ? "Résultat copié" : "Partager"}
         </button>
       </section>
       <PredictionSideCard
@@ -1893,6 +2089,12 @@ function ResultPredictionCard({ prediction }: { prediction: PredictionRecord }) 
       {prediction.scoreDetails && prediction.scoreDetails.length > 0 && (
         <ScoreDetails details={prediction.scoreDetails} />
       )}
+      {(!prediction.scoreDetails || prediction.scoreDetails.length === 0) && (
+        <p className="mt-4 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-3 text-sm font-bold text-[#5f6b7f]">
+          Le détail des points sera disponible pour les prochains résultats
+          calculés automatiquement.
+        </p>
+      )}
     </section>
   );
 }
@@ -1905,7 +2107,7 @@ function ScoreDetails({
   return (
     <div className="mt-4 grid gap-2 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-3">
       <p className="text-xs font-black uppercase tracking-[0.16em] text-[#00baff]">
-        Detail des points
+        Détail des points
       </p>
       {details.map((detail) => (
         <div
@@ -1915,7 +2117,14 @@ function ScoreDetails({
           <span className="text-sm font-black text-[#4e596b]">
             {detail.label}
           </span>
-          <b className={detail.won ? "text-[#00baff]" : "text-[#8b95a5]"}>
+          <b
+            className={
+              detail.won
+                ? "rounded-full bg-[#00baff]/15 px-2 py-1 text-[#00baff]"
+                : "rounded-full bg-[#eef3f8] px-2 py-1 text-[#8b95a5]"
+            }
+          >
+            {detail.won ? "+" : ""}
             {detail.points}/{detail.maxPoints}
           </b>
         </div>
@@ -1926,11 +2135,11 @@ function ScoreDetails({
 
 function PredictionDetails({ pick }: { pick: PredictionPick }) {
   const details = [
-    ["Resultat", pick.result],
+    ["Résultat", pick.result],
     ["Buteur", pick.scorer],
     ["Score exact", pick.exactScore],
-    ["Premiere equipe", pick.firstTeam],
-    ["Derniere equipe", pick.lastTeam],
+    ["Première équipe à marquer", pick.firstTeam],
+    ["Dernière équipe à marquer", pick.lastTeam],
     ["Total buts", pick.goals],
   ];
 

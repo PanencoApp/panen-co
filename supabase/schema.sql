@@ -50,6 +50,7 @@ create table if not exists public.predictions (
   goals_pick text not null,
   status text not null default 'active',
   points int not null default 0,
+  score_details jsonb,
   prediction_date date default ((now() at time zone 'Europe/Paris')::date),
   created_at timestamptz not null default now(),
   unique(user_id, match_id)

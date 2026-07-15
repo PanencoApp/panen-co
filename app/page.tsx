@@ -1963,10 +1963,6 @@ function PredictionForm({
             <option>Moins de 1.5</option>
           </select>
         </Field>
-        <p className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-xs font-bold leading-5 text-[#4e596b]">
-          &Agrave; la validation, 1 jeton sera utilis&eacute; et tes
-          pr&eacute;dictions seront verrouill&eacute;es.
-        </p>
         <button className="h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black">
           Valider mes pr&eacute;dictions
         </button>

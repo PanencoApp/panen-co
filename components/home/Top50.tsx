@@ -24,7 +24,7 @@ export function Top50({ players }: { players: TopPlayer[] }) {
       <div className="mb-3 flex items-end justify-between gap-3">
         <h2 className="text-lg font-black">Top 50 semaine</h2>
         <span className="text-right text-[11px] font-black uppercase text-[#697386]">
-          {currentWeekLabel()} · reset dimanche 00:00
+          {currentWeekLabel()} - reset dimanche 00:00
         </span>
       </div>
       <div className="grid max-h-[420px] gap-2 overflow-auto pr-1">
@@ -53,7 +53,7 @@ export function Top50({ players }: { players: TopPlayer[] }) {
                 {player.points} pts
               </b>
               <small className="mt-1 block rounded-full border border-[#d9e1ea] bg-white px-2 py-1 text-xs font-black text-[#0b0f19] shadow-[0_8px_18px_rgba(15,23,42,.08)]">
-                Prime +{player.reward} &euro;
+                +{player.reward} &euro;
               </small>
             </span>
           </div>

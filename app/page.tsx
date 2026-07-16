@@ -2,10 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  defaultProfile,
-  weeklyRank,
-} from "@/lib/demo-data";
+import { defaultProfile } from "@/lib/demo-data";
 import {
   calculatePredictionScore,
   type MatchResult,
@@ -37,6 +34,8 @@ import {
 import { getTodayMatches } from "@/lib/supabase/matches";
 import {
   addWeeklyPoints,
+  estimateGlobalRank,
+  getMyWeeklyPoints,
   getWeeklyLeaderboard,
 } from "@/lib/supabase/leaderboard";
 import type {
@@ -87,6 +86,22 @@ function exactScoreLabel(score: string) {
   return score === "Autres" ? score : score.replace("-", " - ");
 }
 
+function formatMatchDateTime(date?: string, fallback?: string) {
+  if (!date) return fallback ?? "Date à confirmer";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) return fallback ?? "Date à confirmer";
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    timeZone: "Europe/Paris",
+  }).format(parsedDate);
+}
+
 export default function Home() {
   const [showSplash, setShowSplash] = useState(true);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(1);
@@ -98,6 +113,7 @@ export default function Home() {
   const [challengePlayers, setChallengePlayers] = useState<PlayerOption[]>([]);
   const [predictions, setPredictions] = useState<PredictionRecord[]>([]);
   const [leaderboard, setLeaderboard] = useState<TopPlayer[]>([]);
+  const [weeklyPoints, setWeeklyPoints] = useState(0);
   const [challengeMatch, setChallengeMatch] = useState("");
   const [challengeStep, setChallengeStep] = useState<
     "setup" | "predict" | "share" | "friend" | "result"
@@ -147,13 +163,20 @@ export default function Home() {
   });
   const visibleDonePredictions =
     todayDonePredictions.length > 0 ? todayDonePredictions : pastDonePredictions;
+  const sortedVisibleDonePredictions = [...visibleDonePredictions].sort(
+    (left, right) => (right.score ?? 0) - (left.score ?? 0),
+  );
   const usedMatchIds = predictions.map((prediction) => prediction.matchId);
   const doneDayTotal = visibleDonePredictions.reduce(
     (sum, prediction) => sum + (prediction.score ?? 0),
     0,
   );
-  const updatedWeeklyRank =
-    leaderboard.find((player) => player.isCurrentUser)?.rank ?? weeklyRank;
+  const displayedWeeklyPoints = Math.max(weeklyPoints, doneDayTotal);
+  const weeklyPointsBeforeResults = Math.max(0, displayedWeeklyPoints - doneDayTotal);
+  const rankSeed = currentUserId ?? userProfile.pseudo;
+  const updatedWeeklyRank = estimateGlobalRank(displayedWeeklyPoints, rankSeed);
+  const previousWeeklyRank = estimateGlobalRank(weeklyPointsBeforeResults, rankSeed);
+  const rankDelta = previousWeeklyRank - updatedWeeklyRank;
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -234,6 +257,7 @@ export default function Home() {
           setTokens(1);
           setDailyMatches([]);
           setLeaderboard([]);
+          setWeeklyPoints(0);
           setOnboardingStep(1);
           setView("home");
           return;
@@ -266,6 +290,8 @@ export default function Home() {
         if (isMounted) setPredictions(savedPredictions.data);
         const weeklyPlayers = await getWeeklyLeaderboard(user.id);
         if (isMounted) setLeaderboard(weeklyPlayers);
+        const currentPoints = await getMyWeeklyPoints(user.id);
+        if (isMounted) setWeeklyPoints(currentPoints);
         const todayKey = parisDayKey(new Date());
         const hasPastDoneResults = savedPredictions.data.some((prediction) => {
           const referenceDate = prediction.matchDate ?? prediction.createdAt;
@@ -466,6 +492,8 @@ export default function Home() {
 
       const weeklyPlayers = await getWeeklyLeaderboard(currentUserId);
       setLeaderboard(weeklyPlayers);
+      const currentPoints = await getMyWeeklyPoints(currentUserId);
+      setWeeklyPoints(currentPoints);
     }
 
     setPredictions((items) =>
@@ -476,14 +504,17 @@ export default function Home() {
               status: "done",
               score: scoring.total,
               scoreDetails: scoring.details,
-              rank: weeklyRank,
+              rank: estimateGlobalRank(
+                weeklyPoints + scoring.total,
+                currentUserId ?? userProfile.pseudo,
+              ),
             }
           : prediction,
       ),
     );
     setSelectedMatch(null);
     setView("prediction-done");
-  }, [currentUserId, dailyMatches, predictions, userProfile.pseudo]);
+  }, [currentUserId, dailyMatches, predictions, userProfile.pseudo, weeklyPoints]);
 
   useEffect(() => {
     const pending = predictions.filter(
@@ -519,7 +550,7 @@ export default function Home() {
   }
 
   async function sharePredictionResults() {
-    const text = `Panen&Co : ${doneDayTotal} point${doneDayTotal > 1 ? "s" : ""} récolté${doneDayTotal > 1 ? "s" : ""} aujourd'hui. Rang semaine : ${updatedWeeklyRank}.`;
+    const text = `Panen&Co : ${doneDayTotal} point${doneDayTotal > 1 ? "s" : ""} récolté${doneDayTotal > 1 ? "s" : ""}. Rang actuel : ${updatedWeeklyRank}.`;
 
     try {
       if (navigator.share) {
@@ -634,11 +665,14 @@ export default function Home() {
         setPredictions(savedPredictions.data);
         const weeklyPlayers = await getWeeklyLeaderboard(result.data.user.id);
         setLeaderboard(weeklyPlayers);
+        const currentPoints = await getMyWeeklyPoints(result.data.user.id);
+        setWeeklyPoints(currentPoints);
       } else {
         setTokens(1);
         setPredictions([]);
         const weeklyPlayers = await getWeeklyLeaderboard(null);
         setLeaderboard(weeklyPlayers);
+        setWeeklyPoints(0);
       }
       setOnboardingStep("done");
       setView("home");
@@ -690,6 +724,8 @@ export default function Home() {
       setPredictions(savedPredictions.data);
       const weeklyPlayers = await getWeeklyLeaderboard(result.data.user.id);
       setLeaderboard(weeklyPlayers);
+      const currentPoints = await getMyWeeklyPoints(result.data.user.id);
+      setWeeklyPoints(currentPoints);
       setOnboardingStep("done");
       setView("home");
     } finally {
@@ -765,6 +801,7 @@ export default function Home() {
     setTokens(1);
     setPredictions([]);
     setLeaderboard([]);
+    setWeeklyPoints(0);
     setOnboardingStep("login");
     setView("home");
   }
@@ -1135,41 +1172,64 @@ export default function Home() {
         {view === "prediction-done" && (
           <section className="space-y-4">
             <Header
-              title={"Pr\u00e9dictions termin\u00e9es"}
+              title={"R\u00e9sultats"}
               subtitle={"Classement actualis\u00e9"}
               right={`${tokens} jeton${tokens > 1 ? "s" : ""}`}
               onBack={() => setView("home")}
             />
-            <section className="rounded-3xl border border-green-400/60 bg-green-400/10 p-5 text-center shadow-[0_0_34px_rgba(74,222,128,.16)]">
-              <p className="text-xs font-black uppercase text-green-300">
-                R&eacute;sultats valid&eacute;s
-              </p>
-              <div className="mt-5 grid grid-cols-2 gap-3">
+            <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.10)]">
+              <div className="grid gap-3">
                 <div className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-4">
                   <span className="text-xs font-black uppercase text-[#5f6b7f]">
-                    Total journée
+                    Total de points
                   </span>
-                  <strong className="mt-2 block text-5xl font-black text-[#00baff] drop-shadow-[0_0_18px_rgba(0,186,255,.65)]">
-                    {doneDayTotal}
-                  </strong>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <span className="text-sm font-black text-[#5f6b7f]">
+                      {weeklyPointsBeforeResults} pts
+                    </span>
+                    <span className="rounded-full bg-[#00baff]/15 px-3 py-1 text-sm font-black text-[#00baff]">
+                      +{doneDayTotal}
+                    </span>
+                    <strong className="text-5xl font-black text-[#00baff] drop-shadow-[0_0_18px_rgba(0,186,255,.45)]">
+                      {displayedWeeklyPoints}
+                    </strong>
+                  </div>
                 </div>
+
                 <div className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-4">
                   <span className="text-xs font-black uppercase text-[#5f6b7f]">
-                    Rang semaine
+                    Rang actuel
                   </span>
-                  <strong className="mt-2 block text-5xl font-black text-[#00baff] drop-shadow-[0_0_18px_rgba(0,186,255,.65)]">
-                    {updatedWeeklyRank}
-                  </strong>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <span className="text-sm font-black text-[#5f6b7f]">
+                      {previousWeeklyRank}
+                    </span>
+                    <span
+                      className={
+                        (rankDelta > 0
+                          ? "bg-[#00baff]/15 text-[#00baff]"
+                          : rankDelta < 0
+                            ? "bg-red-50 text-red-500"
+                            : "bg-white text-[#5f6b7f]") +
+                        " rounded-full px-3 py-1 text-sm font-black"
+                      }
+                    >
+                      {rankDelta > 0
+                        ? `↑ ${rankDelta}`
+                        : rankDelta < 0
+                          ? `↓ ${Math.abs(rankDelta)}`
+                          : "→ 0"}
+                    </span>
+                    <strong className="text-5xl font-black text-[#00baff] drop-shadow-[0_0_18px_rgba(0,186,255,.45)]">
+                      {updatedWeeklyRank}
+                    </strong>
+                  </div>
                 </div>
               </div>
-              <p className="mt-4 rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-sm font-bold text-[#4e596b]">
-                Tes scores sont ajout&eacute;s au classement hebdomadaire. Le
-                Top 50 se relance chaque dimanche &agrave; minuit.
-              </p>
             </section>
 
             <div className="grid gap-3">
-              {visibleDonePredictions.map((prediction) => (
+              {sortedVisibleDonePredictions.map((prediction) => (
                 <ResultPredictionCard
                   key={prediction.id}
                   prediction={prediction}
@@ -2278,11 +2338,10 @@ function ResultPredictionCard({ prediction }: { prediction: PredictionRecord }) 
     <section className="rounded-3xl border border-green-400/50 bg-green-400/10 p-4">
       <div className="mb-4 grid grid-cols-[1fr_auto] gap-3">
         <div>
-          <p className="text-xs font-black uppercase text-green-300">
-            Match termin&eacute;
-          </p>
           <h2 className="mt-1 text-xl font-black">{prediction.matchLabel}</h2>
-          <p className="mt-1 text-sm text-[#5f6b7f]">{prediction.matchTime}</p>
+          <p className="mt-1 text-sm text-[#5f6b7f]">
+            {formatMatchDateTime(prediction.matchDate, prediction.matchTime)}
+          </p>
         </div>
         <div className="rounded-2xl bg-[#00baff] px-3 py-2 text-center text-black">
           <b className="block text-2xl">{prediction.score}</b>

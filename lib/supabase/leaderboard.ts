@@ -10,6 +10,180 @@ type WeeklyScoreRow = {
 };
 
 const virtualPseudos = [
+  "falso_nueve",
+  "trequartista_fr",
+  "demi_espace_gauche",
+  "pressing_tout_terrain",
+  "sentinelle_solitaire",
+  "le_onze_type",
+  "foot_romantique",
+  "nostalgie_90s",
+  "le_piston_gauche",
+  "data_and_grinta",
+  "carton_rouge_direct",
+  "xg_merchant_fc",
+  "un_zero_suffira",
+  "prono_chirurgical",
+  "analyste_de_canape",
+  "petit_pont_volontaire",
+  "frappe_en_roule",
+  "gardien_volant_vrai",
+  "tactique_et_merguez",
+  "le_banc_de_touche",
+  "supersub_de_luxe",
+  "double_contact_fluide",
+  "crochet_interieur",
+  "hors_jeu_passif",
+  "lucarne_nettoyee",
+  "arret_sur_la_ligne",
+  "la_main_de_dieu",
+  "tacle_glisse_maitrise",
+  "le_mur_de_briques",
+  "le_petit_bielsa",
+  "la_grinta_dans_les_veines",
+  "virage_nord_mentalite",
+  "kop_passion_foot",
+  "buteur_du_dimanche_soir",
+  "le_poulpe_des_pronos",
+  "madame_irma_fc",
+  "prediction_millimetre",
+  "le_devin_du_ballon",
+  "ticket_valide_extremis",
+  "le_pro_de_la_cote",
+  "prono_safe_uniquement",
+  "le_combine_du_weekend",
+  "la_surprise_du_chef",
+  "hold_up_derniere_minute",
+  "le_specialiste_du_derby",
+  "passion_tactique_football",
+  "le_cerveau_du_milieu",
+  "defenseur_a_l_ancienne",
+  "libero_nostalgique",
+  "renard_des_surfaces_vrai",
+  "gardien_du_temple_fc",
+  "tactique_gagnante_fc",
+  "mercato_addict_fr",
+  "rumeur_de_couloir",
+  "detecteur_de_talents",
+  "football_champagne_fc",
+  "tiki_taka_addict",
+  "appel_contre_appel",
+  "defense_en_zone_fermee",
+  "arbitre_assistant_video",
+  "le_podcasteur_du_foot",
+  "debat_sans_fin_fc",
+  "passion_retro_football",
+  "la_legende_du_club",
+  "histoire_de_derby",
+  "soir_de_match_ambiance",
+  "le_chant_des_supporters",
+  "le_fumi_du_virage",
+  "generation_ultra_football",
+  "chasseur_de_stades",
+  "ambiance_de_folie_fc",
+  "le_chaudron_en_feu",
+  "le_match_de_ma_vie",
+  "le_but_anthologique",
+  "le_scenario_fou",
+  "le_sacre_champion",
+  "la_coupe_a_la_maison",
+  "la_fidelite_au_blason",
+  "le_supporter_inconditionnel",
+  "le_socio_du_football",
+  "le_passionne_du_ballon",
+  "le_roi_du_classement",
+  "le_leader_du_championnat",
+  "la_remontada_historique",
+  "le_braquage_parfait",
+  "la_cote_improbable",
+  "le_pronostiqueur_fou",
+  "le_genie_des_predictions",
+  "oracle_du_football",
+  "le_guide_des_pronos",
+  "la_minute_tactique",
+  "loeil_du_coach",
+  "la_palette_tactique",
+  "le_tableau_noir_fc",
+  "la_discipline_tactique",
+  "la_force_du_collectif",
+  "la_defense_de_fer",
+  "lattaque_de_feu",
+  "le_duo_magique",
+  "le_milieu_a_trois",
+  "le_gardien_libero",
+  "flo.62",
+  "val_tct",
+  "dimitri_ol",
+  "soso_bdt",
+  "mika.bzh",
+  "remi_rcsa",
+  "nico_parigo",
+  "juju.fcgb",
+  "yanis.vfc",
+  "jojo_du_91",
+  "alex.m2",
+  "theo_le_sang",
+  "dylan_om_13",
+  "hugo_r9",
+  "momo_941",
+  "clem.mhsc",
+  "maxou.bdt",
+  "sacha.dz",
+  "guigui_38",
+  "titou_asse",
+  "doudou_om",
+  "lucas_la_grinta",
+  "enzo_la_frappe",
+  "leo_le_buteur",
+  "yo_la_lucarne",
+  "loic_le_tacleur",
+  "cyril_om_le_boss",
+  "gabi_la_panenka",
+  "zizoudu31",
+  "pronoking",
+  "oliveettom",
+  "kimpembefan",
+  "letacticien",
+  "neymarinho",
+  "cornersortant",
+  "buteurfou",
+  "lafrappe",
+  "goalvolant",
+  "samprono",
+  "lapelouse",
+  "lagrinta",
+  "poteaurantant",
+  "le12emehomme",
+  "clean_sheet",
+  "joga_bonito99",
+  "remontada_fc",
+  "plat_du_pied_sec",
+  "mercato_live",
+  "buvette_fc",
+  "tacle_glisse",
+  "numero10",
+  "super_sub",
+  "mur_de_brique",
+  "sifflet_final",
+  "telefoot_nostalgie",
+  "football_manager_addict",
+  "madame_irma",
+  "le_devin",
+  "prono_safe",
+  "le_ticket_gagnant",
+  "la_cote_a_10",
+  "le_combine_fou",
+  "statman",
+  "le_data_foot",
+  "algorithme_fc",
+  "la_gagne",
+  "capitaine_courage",
+  "le_taulier",
+  "la_sentinelle",
+  "le_piston",
+  "le_meneur",
+  "le_finisseur",
+  "le_canonnier",
   "MaxDuFoot",
   "NinoFC",
   "Lucarne7",
@@ -60,6 +234,51 @@ const virtualPseudos = [
   "AminataFC",
   "NaelScore",
   "YanisTop",
+  "RaphProno",
+  "LolaCorner",
+  "IbraTiki",
+  "NicoVAR",
+  "SarahFoot",
+  "DylanZone",
+  "MayaButeur",
+  "BilalDerby",
+  "EmaSurface",
+  "NoamPress",
+  "TessGoal",
+  "YuriScore",
+  "LiamTacle",
+  "ZoeProno",
+  "SamiLiga",
+  "MonaFC",
+  "AxelBut",
+  "InesFinale",
+  "EvanXG",
+  "NeliaFoot",
+  "RomyVAR",
+  "KylianZone",
+  "LorisGoal",
+  "AlyaCorner",
+  "MarinProno",
+  "YounesFC",
+  "LoukaFoot",
+  "EvaLucarne",
+  "NolanDerby",
+  "ArielScore",
+];
+
+const recurringContenders = [
+  "prono_chirurgical",
+  "le_poulpe_des_pronos",
+  "trequartista_fr",
+  "data_and_grinta",
+  "le_specialiste_du_derby",
+  "statman",
+  "le_ticket_gagnant",
+  "le_genie_des_predictions",
+  "letacticien",
+  "MaxDuFoot",
+  "MisterVAR",
+  "Lucarne7",
 ];
 
 function parisDateParts(date = new Date()) {
@@ -80,11 +299,49 @@ function parisDateParts(date = new Date()) {
 export function currentWeekStart() {
   const { year, month, day } = parisDateParts();
   const parisNoon = new Date(Date.UTC(year, month - 1, day, 12));
-  const daysSinceSunday = parisNoon.getUTCDay();
+  const currentDay = parisNoon.getUTCDay() === 0 ? 7 : parisNoon.getUTCDay();
 
-  parisNoon.setUTCDate(parisNoon.getUTCDate() - daysSinceSunday);
+  parisNoon.setUTCDate(parisNoon.getUTCDate() - currentDay + 1);
 
   return parisNoon.toISOString().slice(0, 10);
+}
+
+function stableNumber(value: string) {
+  return [...value].reduce(
+    (sum, character, index) => sum + character.charCodeAt(0) * (index + 1),
+    0,
+  );
+}
+
+export function estimateGlobalRank(points: number, seedKey = "") {
+  if (points <= 0) {
+    return 1200 + (stableNumber(`${seedKey}-${currentWeekStart()}`) % 700);
+  }
+
+  const anchors = [
+    { points: 250, rank: 1 },
+    { points: 90, rank: 50 },
+    { points: 65, rank: 100 },
+    { points: 50, rank: 250 },
+    { points: 32, rank: 500 },
+    { points: 15, rank: 700 },
+    { points: 2, rank: 999 },
+    { points: 0, rank: 1000 },
+  ];
+
+  if (points >= anchors[0].points) return 1;
+
+  for (let index = 0; index < anchors.length - 1; index += 1) {
+    const high = anchors[index];
+    const low = anchors[index + 1];
+
+    if (points <= high.points && points >= low.points) {
+      const progress = (high.points - points) / (high.points - low.points);
+      return Math.round(high.rank + progress * (low.rank - high.rank));
+    }
+  }
+
+  return 1000;
 }
 
 function virtualScore(rank: number) {
@@ -95,6 +352,22 @@ function virtualScore(rank: number) {
   return Math.max(70, 125 - rank - ((rank * 7) % 6));
 }
 
+function weeklyPseudoPool() {
+  const weekKey = currentWeekStart();
+  const seed = [...weekKey].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  const recurring = recurringContenders.filter((_, index) => (seed + index) % 3 !== 0);
+  const allPseudos = virtualPseudos.filter((pseudo) => !recurring.includes(pseudo));
+
+  const weeklyPseudos = allPseudos.sort((left, right) => {
+    const leftScore = (left.charCodeAt(0) * 31 + left.length * 17 + seed) % 997;
+    const rightScore = (right.charCodeAt(0) * 31 + right.length * 17 + seed) % 997;
+
+    return leftScore - rightScore;
+  });
+
+  return [...recurring, ...weeklyPseudos];
+}
+
 function fillWithVirtualPlayers(
   players: TopPlayer[],
   currentUserId?: string | null,
@@ -102,7 +375,7 @@ function fillWithVirtualPlayers(
   const usedPseudos = new Set(players.map((player) => player.pseudo));
   const virtualPlayers: TopPlayer[] = [];
 
-  for (const pseudo of virtualPseudos) {
+  for (const pseudo of weeklyPseudoPool()) {
     if (virtualPlayers.length >= 50) break;
     if (usedPseudos.has(pseudo)) continue;
 
@@ -158,6 +431,21 @@ export async function getWeeklyLeaderboard(currentUserId?: string | null) {
   });
 
   return fillWithVirtualPlayers(realPlayers, currentUserId);
+}
+
+export async function getMyWeeklyPoints(userId: string) {
+  if (!supabase) return 0;
+
+  const result = await supabase
+    .from("weekly_scores")
+    .select("points")
+    .eq("user_id", userId)
+    .eq("week_start", currentWeekStart())
+    .maybeSingle();
+
+  if (result.error) return 0;
+
+  return result.data?.points ?? 0;
 }
 
 export async function addWeeklyPoints({

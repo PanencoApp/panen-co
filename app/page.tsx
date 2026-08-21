@@ -1615,8 +1615,8 @@ export default function Home() {
         <WithdrawalModal
           balance={winningsBalance}
           onClose={() => setShowWithdrawal(false)}
-          onSubmit={async ({ amount, holderName, iban }) => {
-            const result = await requestWithdrawal({ amount, holderName, iban });
+          onSubmit={async ({ amount, paypalEmail }) => {
+            const result = await requestWithdrawal({ amount, paypalEmail });
 
             if (result.error || !result.data) {
               window.alert(result.error?.message ?? "Impossible de demander le retrait.");
@@ -2722,8 +2722,7 @@ function WithdrawalModal({
   onClose: () => void;
   onSubmit: (payload: {
     amount: number;
-    holderName: string;
-    iban: string;
+    paypalEmail: string;
   }) => void | Promise<void>;
   userProfile: UserProfile;
 }) {
@@ -2733,10 +2732,9 @@ function WithdrawalModal({
   async function submitWithdrawal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const holderName = String(form.get("holderName") ?? "").trim();
-    const iban = String(form.get("iban") ?? "").trim();
+    const paypalEmail = String(form.get("paypalEmail") ?? "").trim();
 
-    await onSubmit({ amount, holderName, iban });
+    await onSubmit({ amount, paypalEmail });
   }
 
   return (
@@ -2769,8 +2767,8 @@ function WithdrawalModal({
             {balance} &euro;
           </strong>
           <p className="mt-2 text-sm font-bold text-[#4e596b]">
-            Minimum de retrait : 20 &euro;. Le retrait passe en vérification
-            avant paiement.
+            Minimum de retrait : 20 &euro;. Le paiement est envoy&eacute; vers
+            ton compte PayPal.
           </p>
         </div>
 
@@ -2792,25 +2790,15 @@ function WithdrawalModal({
             </label>
             <label className="grid gap-2">
               <span className="text-xs font-black uppercase text-[#4e596b]">
-                Titulaire du compte
+                Email PayPal
               </span>
               <input
                 className="input"
-                defaultValue={userProfile.pseudo}
-                name="holderName"
-                placeholder="Nom et prénom"
+                defaultValue={userProfile.email}
+                name="paypalEmail"
+                placeholder="email@exemple.com"
                 required
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-xs font-black uppercase text-[#4e596b]">
-                IBAN
-              </span>
-              <input
-                className="input uppercase"
-                name="iban"
-                placeholder="FR76 0000 0000 0000 0000 0000 000"
-                required
+                type="email"
               />
             </label>
             <button
@@ -3004,8 +2992,13 @@ function ProfileDrawer({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <strong className="block">
-                            {request.amount} &euro; vers IBAN ••••{request.ibanLast4}
+                            {request.amount} &euro; vers PayPal
                           </strong>
+                          {request.paypalEmail && (
+                            <span className="block text-sm font-bold text-[#4e596b]">
+                              {request.paypalEmail}
+                            </span>
+                          )}
                           <span className="text-sm font-bold text-[#4e596b]">
                             {new Intl.DateTimeFormat("fr-FR", {
                               day: "numeric",
@@ -3338,11 +3331,18 @@ function AdminWithdrawals({
                   {request.userEmail}
                 </span>
                 <span className="block text-sm font-bold text-[#4e596b]">
-                  Titulaire : {request.holderName}
+                  PayPal : {request.paypalEmail || request.holderName}
                 </span>
-                <span className="block text-sm font-bold text-[#4e596b]">
-                  IBAN : ••••{request.ibanLast4}
-                </span>
+                {request.providerPayoutId && (
+                  <span className="block text-sm font-bold text-[#4e596b]">
+                    Batch PayPal : {request.providerPayoutId}
+                  </span>
+                )}
+                {request.providerStatus && (
+                  <span className="block text-sm font-bold text-[#4e596b]">
+                    Statut PayPal : {request.providerStatus}
+                  </span>
+                )}
               </div>
               <b className="rounded-xl bg-[#eef3f8] px-3 py-2 text-xs uppercase text-[#4e596b]">
                 {withdrawalStatusLabel(request.status)}

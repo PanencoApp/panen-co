@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
   const result = await serverSupabase
     .from("withdrawal_requests")
     .select(
-      "id, user_id, amount_euros, account_holder_name, iban_last4, status, admin_note, created_at, updated_at, profiles!inner(pseudo, email)",
+      "id, user_id, amount_euros, account_holder_name, iban_last4, paypal_email, provider, provider_payout_id, provider_status, status, admin_note, created_at, updated_at, profiles!inner(pseudo, email)",
     )
     .order("created_at", { ascending: false });
 
@@ -191,7 +191,7 @@ export async function PATCH(request: NextRequest) {
     .update(updatePayload)
     .eq("id", id)
     .select(
-      "id, user_id, amount_euros, account_holder_name, iban_last4, status, admin_note, created_at, updated_at, profiles!inner(pseudo, email)",
+      "id, user_id, amount_euros, account_holder_name, iban_last4, paypal_email, provider, provider_payout_id, provider_status, status, admin_note, created_at, updated_at, profiles!inner(pseudo, email)",
     )
     .single();
 

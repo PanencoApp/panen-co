@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createPayPalPayout, isPayPalConfigured } from "@/lib/paypal/client";
 import { isServerSupabaseConfigured, serverSupabase } from "@/lib/supabase/server";
 
 const MIN_WITHDRAWAL_EUROS = 20;
 
-function normalizeIban(value: string) {
-  return value.replace(/\s/g, "").toUpperCase();
-}
-
-function isValidBasicIban(value: string) {
-  return /^[A-Z]{2}[0-9A-Z]{13,32}$/.test(value);
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 export async function POST(request: NextRequest) {
@@ -40,11 +37,10 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json().catch(() => null)) as
-    | { amount?: number; holderName?: string; iban?: string }
+    | { amount?: number; paypalEmail?: string }
     | null;
   const amount = Math.floor(Number(body?.amount ?? 0));
-  const holderName = String(body?.holderName ?? "").trim();
-  const iban = normalizeIban(String(body?.iban ?? ""));
+  const paypalEmail = String(body?.paypalEmail ?? "").trim().toLowerCase();
 
   if (amount < MIN_WITHDRAWAL_EUROS) {
     return NextResponse.json(
@@ -53,16 +49,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (holderName.length < 3) {
+  if (!isValidEmail(paypalEmail)) {
     return NextResponse.json(
-      { error: "Indique le nom du titulaire du compte." },
-      { status: 400 },
-    );
-  }
-
-  if (!isValidBasicIban(iban)) {
-    return NextResponse.json(
-      { error: "IBAN invalide. Vérifie les caractères saisis." },
+      { error: "Indique une adresse email PayPal valide." },
       { status: 400 },
     );
   }
@@ -108,14 +97,16 @@ export async function POST(request: NextRequest) {
   const withdrawal = await serverSupabase
     .from("withdrawal_requests")
     .insert({
+      account_holder_name: paypalEmail,
+      iban: paypalEmail,
+      iban_last4: paypalEmail.slice(-4),
+      paypal_email: paypalEmail,
+      provider: "paypal",
+      status: "pending",
       user_id: user.id,
       amount_euros: amount,
-      account_holder_name: holderName,
-      iban,
-      iban_last4: iban.slice(-4),
-      status: "pending",
     })
-    .select("id, amount_euros, iban_last4, status, created_at")
+    .select("id, amount_euros, iban_last4, paypal_email, provider, status, created_at")
     .single();
 
   if (withdrawal.error) {
@@ -128,6 +119,65 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id);
 
     return NextResponse.json({ error: withdrawal.error.message }, { status: 500 });
+  }
+
+  if (isPayPalConfigured) {
+    try {
+      const payout = await createPayPalPayout({
+        amount,
+        receiverEmail: paypalEmail,
+        withdrawalId: withdrawal.data.id,
+      });
+
+      const updatedWithdrawal = await serverSupabase
+        .from("withdrawal_requests")
+        .update({
+          provider_item_id: withdrawal.data.id,
+          provider_payout_id: payout.batchId,
+          provider_status: payout.status,
+          status: "processing",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", withdrawal.data.id)
+        .select("id, amount_euros, iban_last4, paypal_email, provider, status, created_at")
+        .single();
+
+      if (!updatedWithdrawal.error && updatedWithdrawal.data) {
+        return NextResponse.json({
+          balance: updatedWallet.data.balance_euros,
+          withdrawal: updatedWithdrawal.data,
+        });
+      }
+    } catch (error) {
+      await serverSupabase
+        .from("user_winnings")
+        .update({
+          balance_euros: balance,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
+
+      await serverSupabase
+        .from("withdrawal_requests")
+        .update({
+          provider_error:
+            error instanceof Error ? error.message : "Payout PayPal impossible.",
+          provider_status: "FAILED_TO_CREATE",
+          status: "rejected",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", withdrawal.data.id);
+
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Payout PayPal impossible.",
+        },
+        { status: 502 },
+      );
+    }
   }
 
   return NextResponse.json({

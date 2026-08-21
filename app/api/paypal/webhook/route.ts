@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMangopayPayout, isMangopayConfigured } from "@/lib/mangopay/client";
 import { isServerSupabaseConfigured, serverSupabase } from "@/lib/supabase/server";
 
-const successEvents = new Set(["PAYOUT_NORMAL_SUCCEEDED", "INSTANT_PAYOUT_SUCCEEDED"]);
+const successEvents = new Set(["PAYMENT.PAYOUTS-ITEM.SUCCEEDED"]);
 const failedEvents = new Set([
-  "PAYOUT_NORMAL_FAILED",
-  "INSTANT_PAYOUT_FAILED",
-  "PAYOUT_REFUND_SUCCEEDED",
+  "PAYMENT.PAYOUTS-ITEM.BLOCKED",
+  "PAYMENT.PAYOUTS-ITEM.CANCELED",
+  "PAYMENT.PAYOUTS-ITEM.FAILED",
+  "PAYMENT.PAYOUTS-ITEM.REFUNDED",
+  "PAYMENT.PAYOUTS-ITEM.RETURNED",
 ]);
 
 async function updateWalletForFinalStatus({
@@ -47,7 +48,7 @@ async function updateWalletForFinalStatus({
   return update.error?.message ?? null;
 }
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   if (!isServerSupabaseConfigured || !serverSupabase) {
     return NextResponse.json(
       { error: "Configuration Supabase serveur incomplète." },
@@ -55,10 +56,21 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const eventType = request.nextUrl.searchParams.get("EventType") ?? "";
-  const payoutId = request.nextUrl.searchParams.get("RessourceId") ?? "";
+  const body = (await request.json().catch(() => null)) as
+    | {
+        event_type?: string;
+        resource?: {
+          payout_item?: {
+            sender_item_id?: string;
+          };
+          transaction_status?: string;
+        };
+      }
+    | null;
+  const eventType = body?.event_type ?? "";
+  const withdrawalId = body?.resource?.payout_item?.sender_item_id ?? "";
 
-  if (!payoutId) {
+  if (!withdrawalId) {
     return NextResponse.json({ ok: true });
   }
 
@@ -66,24 +78,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  let providerStatus = eventType;
-  let providerError = "";
-
-  if (isMangopayConfigured) {
-    try {
-      const payout = await getMangopayPayout(payoutId);
-      providerStatus = payout.Status ?? eventType;
-      providerError = payout.ResultMessage ?? "";
-    } catch (error) {
-      providerError =
-        error instanceof Error ? error.message : "Lecture Mangopay impossible.";
-    }
-  }
-
   const withdrawal = await serverSupabase
     .from("withdrawal_requests")
     .select("id, user_id, amount_euros, status")
-    .eq("provider_payout_id", payoutId)
+    .eq("id", withdrawalId)
     .maybeSingle();
 
   if (withdrawal.error || !withdrawal.data) {
@@ -110,9 +108,8 @@ export async function GET(request: NextRequest) {
   const update = await serverSupabase
     .from("withdrawal_requests")
     .update({
-      provider_error: providerError,
       provider_processed_at: new Date().toISOString(),
-      provider_status: providerStatus,
+      provider_status: body?.resource?.transaction_status ?? eventType,
       status: nextStatus,
       updated_at: new Date().toISOString(),
     })

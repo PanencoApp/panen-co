@@ -9,14 +9,18 @@ export type WinningsWallet = {
 export type WithdrawalRequest = {
   id: string;
   amount: number;
-  ibanLast4: string;
-  status: string;
   createdAt: string;
+  ibanLast4: string;
+  paypalEmail?: string;
+  provider?: string;
+  status: string;
 };
 
 export type AdminWithdrawalRequest = WithdrawalRequest & {
   holderName: string;
   note?: string;
+  providerPayoutId?: string;
+  providerStatus?: string;
   updatedAt: string;
   userEmail: string;
   userPseudo: string;
@@ -98,7 +102,7 @@ export async function getMyWithdrawalRequests(
 
   const result = await supabase
     .from("withdrawal_requests")
-    .select("id, amount_euros, iban_last4, status, created_at")
+    .select("id, amount_euros, iban_last4, paypal_email, provider, status, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -107,20 +111,20 @@ export async function getMyWithdrawalRequests(
   return (result.data ?? []).map((request) => ({
     id: request.id,
     amount: request.amount_euros ?? 0,
-    ibanLast4: request.iban_last4 ?? "",
-    status: request.status ?? "pending",
     createdAt: request.created_at ?? new Date().toISOString(),
+    ibanLast4: request.iban_last4 ?? "",
+    paypalEmail: request.paypal_email ?? "",
+    provider: request.provider ?? "",
+    status: request.status ?? "pending",
   }));
 }
 
 export async function requestWithdrawal({
   amount,
-  holderName,
-  iban,
+  paypalEmail,
 }: {
   amount: number;
-  holderName: string;
-  iban: string;
+  paypalEmail: string;
 }) {
   if (!supabase) {
     return {
@@ -140,7 +144,7 @@ export async function requestWithdrawal({
   }
 
   const response = await fetch("/api/withdrawals/request", {
-    body: JSON.stringify({ amount, holderName, iban }),
+    body: JSON.stringify({ amount, paypalEmail }),
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -155,6 +159,8 @@ export async function requestWithdrawal({
           id: string;
           amount_euros: number;
           iban_last4: string;
+          paypal_email?: string;
+          provider?: string;
           status: string;
           created_at: string;
         };
@@ -174,9 +180,11 @@ export async function requestWithdrawal({
       withdrawal: {
         id: payload.withdrawal.id,
         amount: payload.withdrawal.amount_euros,
-        ibanLast4: payload.withdrawal.iban_last4,
-        status: payload.withdrawal.status,
         createdAt: payload.withdrawal.created_at,
+        ibanLast4: payload.withdrawal.iban_last4,
+        paypalEmail: payload.withdrawal.paypal_email ?? "",
+        provider: payload.withdrawal.provider ?? "paypal",
+        status: payload.withdrawal.status,
       } satisfies WithdrawalRequest,
     },
     error: null,
@@ -195,15 +203,19 @@ function toAdminWithdrawal(row: {
   id: string;
   amount_euros?: number;
   account_holder_name?: string;
-  iban_last4?: string;
-  status?: string;
   admin_note?: string | null;
   created_at?: string;
-  updated_at?: string;
+  iban_last4?: string;
+  paypal_email?: string | null;
   profiles?: { pseudo?: string | null; email?: string | null } | Array<{
     pseudo?: string | null;
     email?: string | null;
   }> | null;
+  provider?: string | null;
+  provider_payout_id?: string | null;
+  provider_status?: string | null;
+  status?: string;
+  updated_at?: string;
 }): AdminWithdrawalRequest {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
 
@@ -214,6 +226,10 @@ function toAdminWithdrawal(row: {
     holderName: row.account_holder_name ?? "",
     ibanLast4: row.iban_last4 ?? "",
     note: row.admin_note ?? "",
+    paypalEmail: row.paypal_email ?? "",
+    provider: row.provider ?? "",
+    providerPayoutId: row.provider_payout_id ?? "",
+    providerStatus: row.provider_status ?? "",
     status: row.status ?? "pending",
     updatedAt: row.updated_at ?? row.created_at ?? new Date().toISOString(),
     userEmail: profile?.email ?? "",

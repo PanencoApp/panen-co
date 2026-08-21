@@ -63,6 +63,16 @@ function parisDayKey(date: string | Date) {
   return `${year}-${month}-${day}`;
 }
 
+function isWithinLast24Hours(date?: string) {
+  if (!date) return false;
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) return false;
+
+  return Date.now() - parsedDate.getTime() <= 24 * 60 * 60 * 1000;
+}
+
 const exactScoreOptions = [
   {
     label: "Domicile",
@@ -152,17 +162,12 @@ export default function Home() {
   const donePredictions = predictions.filter(
     (prediction) => prediction.status === "done",
   );
-  const todayDonePredictions = donePredictions.filter((prediction) => {
+  const recentDonePredictions = donePredictions.filter((prediction) => {
     const referenceDate = prediction.matchDate ?? prediction.createdAt;
-    return referenceDate ? parisDayKey(referenceDate) === parisDayKey(new Date()) : false;
+    return isWithinLast24Hours(referenceDate);
   });
-  const homeDonePredictions = resultsSeenToday ? [] : todayDonePredictions;
-  const pastDonePredictions = donePredictions.filter((prediction) => {
-    const referenceDate = prediction.matchDate ?? prediction.createdAt;
-    return referenceDate ? parisDayKey(referenceDate) !== parisDayKey(new Date()) : false;
-  });
-  const visibleDonePredictions =
-    todayDonePredictions.length > 0 ? todayDonePredictions : pastDonePredictions;
+  const homeDonePredictions = resultsSeenToday ? [] : recentDonePredictions;
+  const visibleDonePredictions = recentDonePredictions;
   const sortedVisibleDonePredictions = [...visibleDonePredictions].sort(
     (left, right) => (right.score ?? 0) - (left.score ?? 0),
   );
@@ -292,21 +297,20 @@ export default function Home() {
         if (isMounted) setLeaderboard(weeklyPlayers);
         const currentPoints = await getMyWeeklyPoints(user.id);
         if (isMounted) setWeeklyPoints(currentPoints);
-        const todayKey = parisDayKey(new Date());
-        const hasPastDoneResults = savedPredictions.data.some((prediction) => {
+        const resultsKey = `panen-co-results-seen-${parisDayKey(new Date())}`;
+        const hasFreshDoneResults = savedPredictions.data.some((prediction) => {
           const referenceDate = prediction.matchDate ?? prediction.createdAt;
           return (
             prediction.status === "done" &&
             referenceDate &&
-            parisDayKey(referenceDate) !== todayKey
+            isWithinLast24Hours(referenceDate)
           );
         });
-        const seenResultsKey = `panen-co-results-seen-${todayKey}`;
-        const hasSeenResultsToday = window.localStorage.getItem(seenResultsKey) === "yes";
+        const hasSeenResultsToday = window.localStorage.getItem(resultsKey) === "yes";
         setResultsSeenToday(hasSeenResultsToday);
         setOnboardingStep("done");
         setView(
-          hasPastDoneResults && !hasSeenResultsToday
+          hasFreshDoneResults && !hasSeenResultsToday
             ? "prediction-done"
             : "home",
         );

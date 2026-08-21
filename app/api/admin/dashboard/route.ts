@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentWeekStart } from "@/lib/supabase/leaderboard";
 import { isServerSupabaseConfigured, serverSupabase } from "@/lib/supabase/server";
 
+const adminEmails = new Set(["panenco14@gmail.com"]);
+
 type ProfileRow = {
   created_at: string;
   email: string;
@@ -57,11 +59,20 @@ async function getAdminUser(request: NextRequest) {
 
   const profile = await serverSupabase
     .from("profiles")
-    .select("is_admin")
+    .select("email, is_admin")
     .eq("id", user.id)
     .maybeSingle();
+  const userEmail = user.email?.toLowerCase() ?? "";
+  const profileEmail = profile.data?.email?.toLowerCase() ?? "";
 
-  if (profile.error || profile.data?.is_admin !== true) return null;
+  if (
+    profile.error ||
+    (profile.data?.is_admin !== true &&
+      !adminEmails.has(userEmail) &&
+      !adminEmails.has(profileEmail))
+  ) {
+    return null;
+  }
 
   return user;
 }

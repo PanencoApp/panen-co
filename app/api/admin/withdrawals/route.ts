@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isServerSupabaseConfigured, serverSupabase } from "@/lib/supabase/server";
 
+const adminEmails = new Set(["panenco14@gmail.com"]);
 const allowedStatuses = new Set(["pending", "processing", "paid", "rejected"]);
 
 async function getAdminUser(request: NextRequest) {
@@ -17,11 +18,18 @@ async function getAdminUser(request: NextRequest) {
 
   const profile = await serverSupabase
     .from("profiles")
-    .select("is_admin")
+    .select("email, is_admin")
     .eq("id", user.id)
     .maybeSingle();
+  const userEmail = user.email?.toLowerCase() ?? "";
+  const profileEmail = profile.data?.email?.toLowerCase() ?? "";
 
-  if (profile.error || profile.data?.is_admin !== true) {
+  if (
+    profile.error ||
+    (profile.data?.is_admin !== true &&
+      !adminEmails.has(userEmail) &&
+      !adminEmails.has(profileEmail))
+  ) {
     return null;
   }
 

@@ -2749,10 +2749,15 @@ function WithdrawalModal({
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#00baff]">
-              Retrait
-            </p>
-            <h2 className="mt-1 text-2xl font-black">Retirer mes gains</h2>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] px-3 py-2">
+              <span className="text-lg font-black tracking-[-0.03em] text-[#003087]">
+                Pay
+              </span>
+              <span className="text-lg font-black tracking-[-0.03em] text-[#009cde]">
+                Pal
+              </span>
+            </div>
+            <h2 className="text-2xl font-black">Retirer mes gains</h2>
           </div>
           <button
             className="grid h-10 w-10 place-items-center rounded-full border border-[#d9e1ea] text-lg font-black"

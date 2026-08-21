@@ -155,6 +155,12 @@ export default function Home() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [resultsSeenToday, setResultsSeenToday] = useState(false);
+  const [adminTab, setAdminTab] = useState<
+    "users" | "scores" | "subscriptions" | "withdrawals"
+  >("users");
+  const [adminDashboard, setAdminDashboard] = useState<AdminDashboard | null>(null);
+  const [adminWithdrawals, setAdminWithdrawals] = useState<AdminWithdrawalRequest[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
 
   const selected = useMemo(
     () => dailyMatches.find((match) => match.id === selectedMatch),
@@ -650,6 +656,52 @@ export default function Home() {
     setChallengeStep("setup");
   }
 
+  async function loadAdminData() {
+    if (!userProfile.isAdmin) return;
+
+    setAdminLoading(true);
+    const [dashboard, withdrawals] = await Promise.all([
+      getAdminDashboard(),
+      getAdminWithdrawalRequests(),
+    ]);
+    setAdminLoading(false);
+
+    if (dashboard.error) {
+      window.alert(dashboard.error.message);
+      return;
+    }
+
+    if (withdrawals.error) {
+      window.alert(withdrawals.error.message);
+      return;
+    }
+
+    setAdminDashboard(dashboard.data);
+    setAdminWithdrawals(withdrawals.data);
+  }
+
+  function openAdminDashboard() {
+    setShowProfile(false);
+    setView("admin");
+
+    if (!adminDashboard) {
+      void loadAdminData();
+    }
+  }
+
+  async function updateWithdrawal(id: string, status: string) {
+    const result = await updateAdminWithdrawalStatus({ id, status });
+
+    if (result.error || !result.data) {
+      window.alert(result.error?.message ?? "Impossible de modifier le retrait.");
+      return;
+    }
+
+    setAdminWithdrawals((items) =>
+      items.map((item) => (item.id === id ? result.data! : item)),
+    );
+  }
+
   async function completeOnboarding(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -850,6 +902,8 @@ export default function Home() {
     setWeeklyPoints(0);
     setWinningsBalance(0);
     setWithdrawalRequests([]);
+    setAdminDashboard(null);
+    setAdminWithdrawals([]);
     setOnboardingStep("login");
     setView("home");
   }
@@ -907,7 +961,12 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#eef3f8] text-[#0b0f19]">
-      <div className="mx-auto min-h-screen w-full max-w-[500px] px-4 pb-12 pt-5">
+      <div
+        className={
+          (view === "admin" ? "max-w-[960px]" : "max-w-[500px]") +
+          " mx-auto min-h-screen w-full px-4 pb-12 pt-5"
+        }
+      >
         {view === "home" && (
           <section className="space-y-4">
             <header className="flex items-center justify-between py-3">
@@ -1060,6 +1119,107 @@ export default function Home() {
                     : "Lancer un d\u00e9fi"}
               </button>
             </section>
+          </section>
+        )}
+
+        {view === "admin" && (
+          <section className="space-y-4">
+            <Header
+              title="Dashboard admin"
+              subtitle="Utilisateurs, scores, abonnements et retraits"
+              right="Admin"
+              onBack={() => setView("home")}
+            />
+
+            {userProfile.isAdmin ? (
+              <>
+                <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.10)]">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#00baff]">
+                        Vue admin
+                      </p>
+                      <h1 className="mt-1 text-3xl font-black">
+                        Pilotage Panen&Co
+                      </h1>
+                      <p className="mt-1 text-sm font-bold text-[#4e596b]">
+                        Toutes les infos importantes sur une page dédiée.
+                      </p>
+                    </div>
+                    <button
+                      className="h-12 rounded-2xl border border-[#00baff] px-5 text-sm font-black uppercase text-[#00baff]"
+                      onClick={loadAdminData}
+                      type="button"
+                    >
+                      Actualiser
+                    </button>
+                  </div>
+
+                  {adminDashboard && (
+                    <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+                      <AdminMetric label="Users" value={adminDashboard.summary.totalUsers} />
+                      <AdminMetric label="Emails OK" value={adminDashboard.summary.verifiedEmails} />
+                      <AdminMetric label="Abonnés" value={adminDashboard.summary.activeSubscriptions} />
+                      <AdminMetric label="Prédictions" value={adminDashboard.summary.totalPredictions} />
+                    </div>
+                  )}
+                </section>
+
+                <section className="rounded-3xl border border-[#d9e1ea] bg-white p-3">
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    {[
+                      ["users", "Utilisateurs"],
+                      ["scores", "Scores"],
+                      ["subscriptions", "Abonnements"],
+                      ["withdrawals", "Retraits"],
+                    ].map(([id, label]) => (
+                      <button
+                        className={
+                          (adminTab === id
+                            ? "border-[#00baff] bg-[#00baff] text-black"
+                            : "border-[#d9e1ea] bg-[#f6f8fb] text-[#0b0f19]") +
+                          " h-12 rounded-2xl border text-xs font-black uppercase"
+                        }
+                        key={id}
+                        onClick={() => setAdminTab(id as typeof adminTab)}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                {adminLoading ? (
+                  <EmptyAdminState text="Chargement admin..." />
+                ) : adminDashboard ? (
+                  <section className="rounded-3xl border border-[#d9e1ea] bg-[#f6f8fb] p-4">
+                    {adminTab === "users" && (
+                      <AdminUsersList users={adminDashboard.users} />
+                    )}
+                    {adminTab === "scores" && (
+                      <AdminScores
+                        monthlyScores={adminDashboard.scores.month}
+                        weeklyScores={adminDashboard.scores.week}
+                      />
+                    )}
+                    {adminTab === "subscriptions" && (
+                      <AdminSubscriptions users={adminDashboard.users} />
+                    )}
+                    {adminTab === "withdrawals" && (
+                      <AdminWithdrawals
+                        requests={adminWithdrawals}
+                        onUpdate={updateWithdrawal}
+                      />
+                    )}
+                  </section>
+                ) : (
+                  <EmptyAdminState text="Appuie sur Actualiser pour charger les données admin." />
+                )}
+              </>
+            ) : (
+              <EmptyAdminState text="Accès admin refusé." />
+            )}
           </section>
         )}
 
@@ -1445,6 +1605,7 @@ export default function Home() {
         <ProfileDrawer
           onClose={() => setShowProfile(false)}
           onLogout={logout}
+          onOpenAdmin={openAdminDashboard}
           predictions={predictions}
           userProfile={userProfile}
           withdrawalRequests={withdrawalRequests}
@@ -2681,12 +2842,14 @@ function WithdrawalModal({
 function ProfileDrawer({
   onClose,
   onLogout,
+  onOpenAdmin,
   predictions,
   userProfile,
   withdrawalRequests,
 }: {
   onClose: () => void;
   onLogout: () => void;
+  onOpenAdmin: () => void;
   predictions: PredictionRecord[];
   userProfile: UserProfile;
   withdrawalRequests: WithdrawalRequest[];
@@ -2695,12 +2858,6 @@ function ProfileDrawer({
   const [section, setSection] = useState<
     "history" | "subscription" | "security" | "about" | "help" | "admin"
   >("history");
-  const [adminTab, setAdminTab] = useState<
-    "users" | "scores" | "subscriptions" | "withdrawals"
-  >("users");
-  const [adminDashboard, setAdminDashboard] = useState<AdminDashboard | null>(null);
-  const [adminWithdrawals, setAdminWithdrawals] = useState<AdminWithdrawalRequest[]>([]);
-  const [adminLoading, setAdminLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const historyItems = predictions.map((prediction) => ({
@@ -2722,43 +2879,6 @@ function ProfileDrawer({
     { id: "help", label: "Centre aide" },
     ...(isAdmin ? [{ id: "admin", label: "Admin" } as const] : []),
   ] as const;
-
-  async function loadAdminData() {
-    if (!isAdmin) return;
-
-    setAdminLoading(true);
-    const [dashboard, withdrawals] = await Promise.all([
-      getAdminDashboard(),
-      getAdminWithdrawalRequests(),
-    ]);
-    setAdminLoading(false);
-
-    if (dashboard.error) {
-      window.alert(dashboard.error.message);
-      return;
-    }
-
-    if (withdrawals.error) {
-      window.alert(withdrawals.error.message);
-      return;
-    }
-
-    setAdminDashboard(dashboard.data);
-    setAdminWithdrawals(withdrawals.data);
-  }
-
-  async function updateWithdrawal(id: string, status: string) {
-    const result = await updateAdminWithdrawalStatus({ id, status });
-
-    if (result.error || !result.data) {
-      window.alert(result.error?.message ?? "Impossible de modifier le retrait.");
-      return;
-    }
-
-    setAdminWithdrawals((items) =>
-      items.map((item) => (item.id === id ? result.data! : item)),
-    );
-  }
 
   return (
     <aside className="fixed inset-0 z-50 bg-black/25 backdrop-blur-lg">
@@ -2825,9 +2945,6 @@ function ProfileDrawer({
               key={item.id}
               onClick={() => {
                 setSection(item.id);
-                if (item.id === "admin" && !adminDashboard) {
-                  void loadAdminData();
-                }
               }}
               type="button"
             >
@@ -2988,84 +3105,19 @@ function ProfileDrawer({
           {section === "admin" && isAdmin && (
             <ProfilePanel title="Admin">
               <div className="rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <strong className="block text-lg">Tableau de bord</strong>
-                    <span className="text-sm font-bold text-[#4e596b]">
-                      Utilisateurs, scores, abonnements et retraits.
-                    </span>
-                  </div>
-                  <button
-                    className="rounded-xl border border-[#00baff] px-3 py-2 text-xs font-black uppercase text-[#00baff]"
-                    onClick={loadAdminData}
-                    type="button"
-                  >
-                    Actualiser
-                  </button>
-                </div>
-                {adminDashboard && (
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <AdminMetric label="Users" value={adminDashboard.summary.totalUsers} />
-                    <AdminMetric label="Emails OK" value={adminDashboard.summary.verifiedEmails} />
-                    <AdminMetric label="Abonnés" value={adminDashboard.summary.activeSubscriptions} />
-                    <AdminMetric label="Prédictions" value={adminDashboard.summary.totalPredictions} />
-                  </div>
-                )}
+                <strong className="block text-lg">Tableau de bord admin</strong>
+                <span className="mt-1 block text-sm font-bold leading-6 text-[#4e596b]">
+                  Ouvre une page dédiée pour suivre les utilisateurs, les scores,
+                  les abonnements et les demandes de retrait avec plus d’espace.
+                </span>
+                <button
+                  className="mt-4 h-12 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black"
+                  onClick={onOpenAdmin}
+                  type="button"
+                >
+                  Ouvrir le dashboard
+                </button>
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  ["users", "Utilisateurs"],
-                  ["scores", "Scores"],
-                  ["subscriptions", "Abonnements"],
-                  ["withdrawals", "Retraits"],
-                ].map(([id, label]) => (
-                  <button
-                    className={
-                      (adminTab === id
-                        ? "border-[#00baff] bg-[#00baff] text-black"
-                        : "border-[#d9e1ea] bg-white text-[#0b0f19]") +
-                      " h-10 rounded-xl border text-xs font-black uppercase"
-                    }
-                    key={id}
-                    onClick={() => setAdminTab(id as typeof adminTab)}
-                    type="button"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {adminLoading ? (
-                <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
-                  Chargement admin...
-                </div>
-              ) : adminDashboard ? (
-                <>
-                  {adminTab === "users" && (
-                    <AdminUsersList users={adminDashboard.users} />
-                  )}
-                  {adminTab === "scores" && (
-                    <AdminScores
-                      monthlyScores={adminDashboard.scores.month}
-                      weeklyScores={adminDashboard.scores.week}
-                    />
-                  )}
-                  {adminTab === "subscriptions" && (
-                    <AdminSubscriptions users={adminDashboard.users} />
-                  )}
-                  {adminTab === "withdrawals" && (
-                    <AdminWithdrawals
-                      requests={adminWithdrawals}
-                      onUpdate={updateWithdrawal}
-                    />
-                  )}
-                </>
-              ) : (
-                <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
-                  Appuie sur Actualiser pour charger les données admin.
-                </div>
-              )}
             </ProfilePanel>
           )}
         </div>

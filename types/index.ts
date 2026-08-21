@@ -1,5 +1,6 @@
 export type View =
   | "home"
+  | "admin"
   | "matches"
   | "challenge"
   | "prediction-active"

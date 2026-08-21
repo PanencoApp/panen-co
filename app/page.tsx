@@ -2749,13 +2749,14 @@ function WithdrawalModal({
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] px-3 py-2">
-              <span className="text-lg font-black tracking-[-0.03em] text-[#003087]">
-                Pay
-              </span>
-              <span className="text-lg font-black tracking-[-0.03em] text-[#009cde]">
-                Pal
-              </span>
+            <div className="mb-3 inline-flex h-12 items-center rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] px-4">
+              <Image
+                alt="PayPal"
+                className="h-auto w-28 object-contain"
+                height={36}
+                src="/paypal-logo.webp"
+                width={140}
+              />
             </div>
             <h2 className="text-2xl font-black">Retirer mes gains</h2>
           </div>

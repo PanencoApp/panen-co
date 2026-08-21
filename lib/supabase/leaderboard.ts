@@ -10,6 +10,131 @@ type WeeklyScoreRow = {
 };
 
 const virtualPseudos = [
+  "Lucas Martin",
+  "Hugo Bernard",
+  "Thomas Petit",
+  "Enzo Robert",
+  "Mathieu Laurent",
+  "Romain Dubois",
+  "Bastien Moreau",
+  "Quentin Roux",
+  "Damien Bertrand",
+  "Florian Girard",
+  "Adrien Bonnet",
+  "Nicolas Lambert",
+  "Julien Morin",
+  "Alexis Robin",
+  "Vincent Leclerc",
+  "Clement Ferry",
+  "Jeremy Collin",
+  "Thibault Vidal",
+  "Guillaume Brunet",
+  "Valentin Mercier",
+  "Antoine Marchand",
+  "Arthur Meunier",
+  "Louis Bertin",
+  "Paul Legros",
+  "Adam Maillard",
+  "Gabin Roussel",
+  "Nathan Denis",
+  "Mathis Perrin",
+  "Noah Boucher",
+  "Ryan Schmitt",
+  "Yanis Breton",
+  "Sofiane Dumas",
+  "Amine Colas",
+  "Mehdi Renaud",
+  "Sami Courtin",
+  "Anis Carlier",
+  "Idris Maillet",
+  "Nabil Henry",
+  "Walid Pichon",
+  "Selim Rolland",
+  "Hakim Moret",
+  "Adel Dumont",
+  "Mounir Cordier",
+  "Lucas_94",
+  "Antoine.8",
+  "Max_98",
+  "Thomas_69",
+  "Julien_FC",
+  "Clement_OM",
+  "Tom_AC",
+  "Mathieu_R",
+  "Alex_db",
+  "Pierre.m",
+  "Nico_75",
+  "Hugo.lnt",
+  "Yanis_92",
+  "Alex_PSG",
+  "Theo_31",
+  "Romain_OL",
+  "Enzo_rc",
+  "Samy_93",
+  "Kelyan_b",
+  "Mathis_13",
+  "Valentin_rcs",
+  "Leo_29",
+  "Quentin_db",
+  "Maxime_v",
+  "Arthur_59",
+  "Simon_fc",
+  "Gabin_76",
+  "Paul.b",
+  "Dylan_91",
+  "Adrien_rc",
+  "Nathan_83",
+  "Axel.p",
+  "Florian_62",
+  "Kevin_OM",
+  "Guillaume_78",
+  "Bastien_OL",
+  "Jeremy_38",
+  "Maxence_l",
+  "Alexis_44",
+  "Corentin_b",
+  "Baptiste_51",
+  "Jordan_95",
+  "Tristan_fc",
+  "Loic_22",
+  "Anthony_84",
+  "Thibault_m",
+  "Killian_35",
+  "Benjamin_77",
+  "Damien_fc",
+  "Cedric_33",
+  "Mika_94",
+  "Robin_OL",
+  "Yohan_60",
+  "Seb_75",
+  "Xavier_b",
+  "Louis_86",
+  "Jonas_rc",
+  "Remi_42",
+  "Alan_29",
+  "Victor.d",
+  "Samuel_74",
+  "Matteo_OM",
+  "Fabien_57",
+  "Theo_lmt",
+  "Jules_21",
+  "Arnaud_92",
+  "Vincent_87",
+  "Florent_34",
+  "Nolan_56",
+  "Tony_93",
+  "Cyril.p",
+  "Rayan_91",
+  "Christopher_62",
+  "Dorian_81",
+  "Mael_22",
+  "Kilian_fc",
+  "Gabriel_75",
+  "Ludovic_59",
+  "Alexandre_r",
+  "Stephane_69",
+  "Morgan_29",
+  "Tanguy_35",
   "falso_nueve",
   "trequartista_fr",
   "demi_espace_gauche",
@@ -267,6 +392,10 @@ const virtualPseudos = [
 ];
 
 const recurringContenders = [
+  "Lucas Martin",
+  "Hugo Bernard",
+  "Max_98",
+  "Romain_OL",
   "prono_chirurgical",
   "le_poulpe_des_pronos",
   "trequartista_fr",
@@ -356,7 +485,8 @@ function weeklyPseudoPool() {
   const weekKey = currentWeekStart();
   const seed = [...weekKey].reduce((sum, character) => sum + character.charCodeAt(0), 0);
   const recurring = recurringContenders.filter((_, index) => (seed + index) % 3 !== 0);
-  const allPseudos = virtualPseudos.filter((pseudo) => !recurring.includes(pseudo));
+  const uniquePseudos = [...new Set(virtualPseudos)];
+  const allPseudos = uniquePseudos.filter((pseudo) => !recurring.includes(pseudo));
 
   const weeklyPseudos = allPseudos.sort((left, right) => {
     const leftScore = (left.charCodeAt(0) * 31 + left.length * 17 + seed) % 997;
@@ -368,10 +498,7 @@ function weeklyPseudoPool() {
   return [...recurring, ...weeklyPseudos];
 }
 
-function fillWithVirtualPlayers(
-  players: TopPlayer[],
-  currentUserId?: string | null,
-) {
+function fillWithVirtualPlayers(players: TopPlayer[]) {
   const usedPseudos = new Set(players.map((player) => player.pseudo));
   const virtualPlayers: TopPlayer[] = [];
 
@@ -402,12 +529,12 @@ function fillWithVirtualPlayers(
       ...player,
       rank: index + 1,
       reward: rewardForRank(index + 1),
-      isCurrentUser: player.isCurrentUser || player.pseudo === currentUserId,
+      isCurrentUser: player.isCurrentUser,
     }));
 }
 
 export async function getWeeklyLeaderboard(currentUserId?: string | null) {
-  if (!supabase) return fillWithVirtualPlayers([], currentUserId);
+  if (!supabase) return fillWithVirtualPlayers([]);
 
   const result = await supabase
     .from("weekly_scores")
@@ -416,7 +543,7 @@ export async function getWeeklyLeaderboard(currentUserId?: string | null) {
     .order("points", { ascending: false })
     .limit(50);
 
-  if (result.error) return fillWithVirtualPlayers([], currentUserId);
+  if (result.error) return fillWithVirtualPlayers([]);
 
   const realPlayers = ((result.data ?? []) as WeeklyScoreRow[]).map((row, index) => {
     const rank = index + 1;
@@ -430,7 +557,7 @@ export async function getWeeklyLeaderboard(currentUserId?: string | null) {
     } satisfies TopPlayer;
   });
 
-  return fillWithVirtualPlayers(realPlayers, currentUserId);
+  return fillWithVirtualPlayers(realPlayers);
 }
 
 export async function getMyWeeklyPoints(userId: string) {

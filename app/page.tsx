@@ -39,8 +39,11 @@ import {
   getWeeklyLeaderboard,
 } from "@/lib/supabase/leaderboard";
 import {
+  getMyWithdrawalRequests,
   getMyWinnings,
+  requestWithdrawal,
   syncMyWeeklyWinnings,
+  type WithdrawalRequest,
 } from "@/lib/supabase/winnings";
 import type {
   MatchOption,
@@ -129,6 +132,7 @@ export default function Home() {
   const [leaderboard, setLeaderboard] = useState<TopPlayer[]>([]);
   const [weeklyPoints, setWeeklyPoints] = useState(0);
   const [winningsBalance, setWinningsBalance] = useState(0);
+  const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
   const [challengeMatch, setChallengeMatch] = useState("");
   const [challengeStep, setChallengeStep] = useState<
     "setup" | "predict" | "share" | "friend" | "result"
@@ -139,6 +143,7 @@ export default function Home() {
   const [challengeFriendPseudo] = useState("Malo7");
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
+  const [showWithdrawal, setShowWithdrawal] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -269,6 +274,7 @@ export default function Home() {
           setLeaderboard([]);
           setWeeklyPoints(0);
           setWinningsBalance(0);
+          setWithdrawalRequests([]);
           setOnboardingStep(1);
           setView("home");
           return;
@@ -306,6 +312,8 @@ export default function Home() {
         await syncMyWeeklyWinnings();
         const winnings = await getMyWinnings(user.id);
         if (isMounted) setWinningsBalance(winnings.balance);
+        const withdrawals = await getMyWithdrawalRequests(user.id);
+        if (isMounted) setWithdrawalRequests(withdrawals);
         const resultsKey = `panen-co-results-seen-${parisDayKey(new Date())}`;
         const hasFreshDoneResults = savedPredictions.data.some((prediction) => {
           const referenceDate = prediction.matchDate ?? prediction.createdAt;
@@ -510,6 +518,8 @@ export default function Home() {
       await syncMyWeeklyWinnings();
       const winnings = await getMyWinnings(currentUserId);
       setWinningsBalance(winnings.balance);
+      const withdrawals = await getMyWithdrawalRequests(currentUserId);
+      setWithdrawalRequests(withdrawals);
     }
 
     setPredictions((items) =>
@@ -686,6 +696,8 @@ export default function Home() {
         await syncMyWeeklyWinnings();
         const winnings = await getMyWinnings(result.data.user.id);
         setWinningsBalance(winnings.balance);
+        const withdrawals = await getMyWithdrawalRequests(result.data.user.id);
+        setWithdrawalRequests(withdrawals);
       } else {
         setTokens(1);
         setPredictions([]);
@@ -693,6 +705,7 @@ export default function Home() {
         setLeaderboard(weeklyPlayers);
         setWeeklyPoints(0);
         setWinningsBalance(0);
+        setWithdrawalRequests([]);
       }
       setOnboardingStep("done");
       setView("home");
@@ -749,6 +762,8 @@ export default function Home() {
       await syncMyWeeklyWinnings();
       const winnings = await getMyWinnings(result.data.user.id);
       setWinningsBalance(winnings.balance);
+      const withdrawals = await getMyWithdrawalRequests(result.data.user.id);
+      setWithdrawalRequests(withdrawals);
       setOnboardingStep("done");
       setView("home");
     } finally {
@@ -826,6 +841,7 @@ export default function Home() {
     setLeaderboard([]);
     setWeeklyPoints(0);
     setWinningsBalance(0);
+    setWithdrawalRequests([]);
     setOnboardingStep("login");
     setView("home");
   }
@@ -932,6 +948,7 @@ export default function Home() {
                 <b>{winningsBalance} &euro;</b>
                 <button
                   className="rounded-full border border-[#d8e2ea] px-3 py-1 text-xs font-black"
+                  onClick={() => setShowWithdrawal(true)}
                   type="button"
                 >
                   Retirer
@@ -1421,6 +1438,30 @@ export default function Home() {
           onClose={() => setShowProfile(false)}
           onLogout={logout}
           predictions={predictions}
+          userProfile={userProfile}
+          withdrawalRequests={withdrawalRequests}
+        />
+      )}
+      {showWithdrawal && (
+        <WithdrawalModal
+          balance={winningsBalance}
+          onClose={() => setShowWithdrawal(false)}
+          onSubmit={async ({ amount, holderName, iban }) => {
+            const result = await requestWithdrawal({ amount, holderName, iban });
+
+            if (result.error || !result.data) {
+              window.alert(result.error?.message ?? "Impossible de demander le retrait.");
+              return;
+            }
+
+            setWinningsBalance(result.data.balance);
+            setWithdrawalRequests((items) => [
+              result.data!.withdrawal,
+              ...items,
+            ]);
+            setShowWithdrawal(false);
+            window.alert("Demande de retrait envoyée. Elle passe en vérification.");
+          }}
           userProfile={userProfile}
         />
       )}
@@ -2495,16 +2536,152 @@ function TokenModal({
   );
 }
 
+function withdrawalStatusLabel(status: string) {
+  if (status === "paid") return "Payé";
+  if (status === "rejected") return "Refusé";
+  if (status === "processing") return "En paiement";
+  return "En vérification";
+}
+
+function WithdrawalModal({
+  balance,
+  onClose,
+  onSubmit,
+  userProfile,
+}: {
+  balance: number;
+  onClose: () => void;
+  onSubmit: (payload: {
+    amount: number;
+    holderName: string;
+    iban: string;
+  }) => void | Promise<void>;
+  userProfile: UserProfile;
+}) {
+  const [amount, setAmount] = useState(Math.min(balance, Math.max(20, balance)));
+  const canWithdraw = balance >= 20;
+
+  async function submitWithdrawal(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const holderName = String(form.get("holderName") ?? "").trim();
+    const iban = String(form.get("iban") ?? "").trim();
+
+    await onSubmit({ amount, holderName, iban });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-5 backdrop-blur-lg">
+      <form
+        className="w-full max-w-[430px] rounded-3xl border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.10)]"
+        onSubmit={submitWithdrawal}
+      >
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#00baff]">
+              Retrait
+            </p>
+            <h2 className="mt-1 text-2xl font-black">Retirer mes gains</h2>
+          </div>
+          <button
+            className="grid h-10 w-10 place-items-center rounded-full border border-[#d9e1ea] text-lg font-black"
+            onClick={onClose}
+            type="button"
+          >
+            x
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-4">
+          <span className="text-xs font-black uppercase text-[#4e596b]">
+            Solde disponible
+          </span>
+          <strong className="mt-1 block text-4xl text-[#00baff]">
+            {balance} &euro;
+          </strong>
+          <p className="mt-2 text-sm font-bold text-[#4e596b]">
+            Minimum de retrait : 20 &euro;. Le retrait passe en vérification
+            avant paiement.
+          </p>
+        </div>
+
+        {canWithdraw ? (
+          <div className="mt-4 grid gap-3">
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase text-[#4e596b]">
+                Montant
+              </span>
+              <input
+                className="input"
+                max={balance}
+                min={20}
+                onChange={(event) => setAmount(Number(event.target.value))}
+                required
+                type="number"
+                value={amount}
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase text-[#4e596b]">
+                Titulaire du compte
+              </span>
+              <input
+                className="input"
+                defaultValue={userProfile.pseudo}
+                name="holderName"
+                placeholder="Nom et prénom"
+                required
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase text-[#4e596b]">
+                IBAN
+              </span>
+              <input
+                className="input uppercase"
+                name="iban"
+                placeholder="FR76 0000 0000 0000 0000 0000 000"
+                required
+              />
+            </label>
+            <button
+              className="h-13 rounded-2xl bg-[#00baff] font-black uppercase text-black"
+              type="submit"
+            >
+              Demander le retrait
+            </button>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold leading-6 text-[#4e596b]">
+            Tu pourras demander un retrait dès que ton solde gains atteindra
+            20 &euro;.
+          </div>
+        )}
+
+        <button
+          className="mt-3 h-12 w-full rounded-2xl border border-[#00baff] font-black uppercase text-[#00baff]"
+          onClick={onClose}
+          type="button"
+        >
+          Fermer
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function ProfileDrawer({
   onClose,
   onLogout,
   predictions,
   userProfile,
+  withdrawalRequests,
 }: {
   onClose: () => void;
   onLogout: () => void;
   predictions: PredictionRecord[];
   userProfile: UserProfile;
+  withdrawalRequests: WithdrawalRequest[];
 }) {
   const [section, setSection] = useState<
     "history" | "subscription" | "security" | "about" | "help"
@@ -2639,6 +2816,41 @@ function ProfileDrawer({
 
           {section === "history" && (
             <ProfilePanel title="Historique">
+              {withdrawalRequests.length > 0 && (
+                <div className="grid gap-2">
+                  <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#4e596b]">
+                    Retraits
+                  </h4>
+                  {withdrawalRequests.map((request) => (
+                    <div
+                      className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
+                      key={request.id}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <strong className="block">
+                            {request.amount} &euro; vers IBAN ••••{request.ibanLast4}
+                          </strong>
+                          <span className="text-sm font-bold text-[#4e596b]">
+                            {new Intl.DateTimeFormat("fr-FR", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            }).format(new Date(request.createdAt))}
+                          </span>
+                        </div>
+                        <b className="rounded-xl bg-[#eef3f8] px-3 py-2 text-xs uppercase text-[#4e596b]">
+                          {withdrawalStatusLabel(request.status)}
+                        </b>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#4e596b]">
+                Pr&eacute;dictions
+              </h4>
               {historyItems.length > 0 ? (
                 historyItems.map((item) => (
                   <div

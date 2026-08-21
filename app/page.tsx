@@ -1632,7 +1632,7 @@ export default function Home() {
             window.alert(
               result.data.withdrawal.status === "processing"
                 ? "Retrait validé, vous recevrez l'argent sur votre compte PayPal dans quelques instants."
-                : "Demande de retrait envoyée. Elle passe en vérification.",
+                : "Retrait impossible, le compte renseigné est introuvable.",
             );
           }}
           userProfile={userProfile}
@@ -2713,7 +2713,7 @@ function withdrawalStatusLabel(status: string) {
   if (status === "paid") return "Payé";
   if (status === "rejected") return "Refusé";
   if (status === "processing") return "En paiement";
-  return "En vérification";
+  return "Non finalisé";
 }
 
 function WithdrawalModal({
@@ -3354,7 +3354,7 @@ function AdminWithdrawals({
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {[
-                ["pending", "Vérification"],
+                ["pending", "Non finalisé"],
                 ["processing", "Paiement"],
                 ["paid", "Payé"],
                 ["rejected", "Refusé"],

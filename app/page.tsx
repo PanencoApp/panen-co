@@ -39,10 +39,13 @@ import {
   getWeeklyLeaderboard,
 } from "@/lib/supabase/leaderboard";
 import {
+  getAdminWithdrawalRequests,
   getMyWithdrawalRequests,
   getMyWinnings,
   requestWithdrawal,
   syncMyWeeklyWinnings,
+  updateAdminWithdrawalStatus,
+  type AdminWithdrawalRequest,
   type WithdrawalRequest,
 } from "@/lib/supabase/winnings";
 import type {
@@ -2683,9 +2686,12 @@ function ProfileDrawer({
   userProfile: UserProfile;
   withdrawalRequests: WithdrawalRequest[];
 }) {
+  const isAdmin = userProfile.pseudo.trim().toLowerCase() === "admin";
   const [section, setSection] = useState<
-    "history" | "subscription" | "security" | "about" | "help"
+    "history" | "subscription" | "security" | "about" | "help" | "admin"
   >("history");
+  const [adminWithdrawals, setAdminWithdrawals] = useState<AdminWithdrawalRequest[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const historyItems = predictions.map((prediction) => ({
@@ -2705,7 +2711,36 @@ function ProfileDrawer({
     { id: "security", label: "Securite" },
     { id: "about", label: "A propos" },
     { id: "help", label: "Centre aide" },
+    ...(isAdmin ? [{ id: "admin", label: "Admin" } as const] : []),
   ] as const;
+
+  async function loadAdminWithdrawals() {
+    if (!isAdmin) return;
+
+    setAdminLoading(true);
+    const result = await getAdminWithdrawalRequests();
+    setAdminLoading(false);
+
+    if (result.error) {
+      window.alert(result.error.message);
+      return;
+    }
+
+    setAdminWithdrawals(result.data);
+  }
+
+  async function updateWithdrawal(id: string, status: string) {
+    const result = await updateAdminWithdrawalStatus({ id, status });
+
+    if (result.error || !result.data) {
+      window.alert(result.error?.message ?? "Impossible de modifier le retrait.");
+      return;
+    }
+
+    setAdminWithdrawals((items) =>
+      items.map((item) => (item.id === id ? result.data! : item)),
+    );
+  }
 
   return (
     <aside className="fixed inset-0 z-50 bg-black/25 backdrop-blur-lg">
@@ -2770,7 +2805,12 @@ function ProfileDrawer({
                 " h-11 rounded-2xl border px-3 text-left text-sm font-black"
               }
               key={item.id}
-              onClick={() => setSection(item.id)}
+              onClick={() => {
+                setSection(item.id);
+                if (item.id === "admin" && adminWithdrawals.length === 0) {
+                  void loadAdminWithdrawals();
+                }
+              }}
               type="button"
             >
               {item.label}
@@ -2924,6 +2964,87 @@ function ProfileDrawer({
               <p className="text-sm font-bold text-[#4e596b]">
                 Reponse assuree sous 24h.
               </p>
+            </ProfilePanel>
+          )}
+
+          {section === "admin" && isAdmin && (
+            <ProfilePanel title="Admin retraits">
+              <div className="rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <strong className="block text-lg">Demandes de retrait</strong>
+                    <span className="text-sm font-bold text-[#4e596b]">
+                      Suivi manuel avant branchement Mangopay ou Lemonway.
+                    </span>
+                  </div>
+                  <button
+                    className="rounded-xl border border-[#00baff] px-3 py-2 text-xs font-black uppercase text-[#00baff]"
+                    onClick={loadAdminWithdrawals}
+                    type="button"
+                  >
+                    Actualiser
+                  </button>
+                </div>
+              </div>
+
+              {adminLoading ? (
+                <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
+                  Chargement des retraits...
+                </div>
+              ) : adminWithdrawals.length > 0 ? (
+                adminWithdrawals.map((request) => (
+                  <div
+                    className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
+                    key={request.id}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <strong className="block text-lg">
+                          {request.amount} &euro; · {request.userPseudo}
+                        </strong>
+                        <span className="block text-sm font-bold text-[#4e596b]">
+                          {request.userEmail}
+                        </span>
+                        <span className="block text-sm font-bold text-[#4e596b]">
+                          Titulaire : {request.holderName}
+                        </span>
+                        <span className="block text-sm font-bold text-[#4e596b]">
+                          IBAN : ••••{request.ibanLast4}
+                        </span>
+                      </div>
+                      <b className="rounded-xl bg-[#eef3f8] px-3 py-2 text-xs uppercase text-[#4e596b]">
+                        {withdrawalStatusLabel(request.status)}
+                      </b>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      {[
+                        ["pending", "Vérification"],
+                        ["processing", "Paiement"],
+                        ["paid", "Payé"],
+                        ["rejected", "Refusé"],
+                      ].map(([status, label]) => (
+                        <button
+                          className={
+                            (request.status === status
+                              ? "border-[#00baff] bg-[#00baff] text-black"
+                              : "border-[#d9e1ea] bg-white text-[#0b0f19]") +
+                            " h-10 rounded-xl border text-xs font-black uppercase"
+                          }
+                          key={status}
+                          onClick={() => updateWithdrawal(request.id, status)}
+                          type="button"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
+                  Aucune demande de retrait pour le moment.
+                </div>
+              )}
             </ProfilePanel>
           )}
         </div>

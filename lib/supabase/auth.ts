@@ -137,7 +137,7 @@ export async function getProfile(userId: string) {
 
   return supabase
     .from("profiles")
-    .select("pseudo,email")
+    .select("pseudo,email,is_admin")
     .eq("id", userId)
     .single();
 }

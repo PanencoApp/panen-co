@@ -292,6 +292,7 @@ export default function Home() {
         setUserProfile({
           pseudo,
           email,
+          isAdmin: profile.data?.is_admin === true,
           password: "********",
         });
         setCurrentUserId(user.id);
@@ -679,7 +680,7 @@ export default function Home() {
         return;
       }
 
-      setUserProfile({ pseudo, email, password });
+      setUserProfile({ pseudo, email, isAdmin: false, password });
       setCurrentUserId(result.data.session ? (result.data.user?.id ?? null) : null);
       const todayMatches = await getTodayMatches();
       setDailyMatches(todayMatches.data);
@@ -741,6 +742,7 @@ export default function Home() {
       setUserProfile({
         pseudo,
         email: profile.data?.email ?? email,
+        isAdmin: profile.data?.is_admin === true,
         password,
       });
       setCurrentUserId(result.data.user.id);
@@ -2686,7 +2688,7 @@ function ProfileDrawer({
   userProfile: UserProfile;
   withdrawalRequests: WithdrawalRequest[];
 }) {
-  const isAdmin = userProfile.pseudo.trim().toLowerCase() === "admin";
+  const isAdmin = userProfile.isAdmin === true;
   const [section, setSection] = useState<
     "history" | "subscription" | "security" | "about" | "help" | "admin"
   >("history");

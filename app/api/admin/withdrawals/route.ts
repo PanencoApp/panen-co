@@ -17,11 +17,11 @@ async function getAdminUser(request: NextRequest) {
 
   const profile = await serverSupabase
     .from("profiles")
-    .select("pseudo, email")
+    .select("is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profile.error || profile.data?.pseudo?.toLowerCase() !== "admin") {
+  if (profile.error || profile.data?.is_admin !== true) {
     return null;
   }
 

@@ -48,6 +48,7 @@ export type UserProfile = {
   pseudo: string;
   email: string;
   password: string;
+  isAdmin?: boolean;
 };
 
 export type MatchOption = {

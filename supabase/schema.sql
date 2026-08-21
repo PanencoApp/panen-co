@@ -8,6 +8,7 @@ create table if not exists public.profiles (
   pseudo text not null unique,
   email text not null,
   is_adult boolean not null default false,
+  is_admin boolean not null default false,
   notifications_enabled boolean not null default true,
   created_at timestamptz not null default now()
 );

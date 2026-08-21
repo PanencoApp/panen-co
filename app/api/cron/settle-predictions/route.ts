@@ -5,6 +5,7 @@ import {
   isServerSupabaseConfigured,
   serverSupabase,
 } from "@/lib/supabase/server";
+import { syncWeeklyRewards } from "@/lib/supabase/winnings-server";
 import type { PredictionPick } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -295,8 +296,14 @@ export async function GET(request: NextRequest) {
       .eq("id", match.id);
   }
 
+  const rewards =
+    settled > 0
+      ? await syncWeeklyRewards().catch(() => ({ creditedUsers: 0 }))
+      : { creditedUsers: 0 };
+
   return NextResponse.json({
     checked: rows.length,
+    creditedUsers: rewards.creditedUsers,
     settled,
   });
 }

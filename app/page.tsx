@@ -38,6 +38,10 @@ import {
   getMyWeeklyPoints,
   getWeeklyLeaderboard,
 } from "@/lib/supabase/leaderboard";
+import {
+  getMyWinnings,
+  syncMyWeeklyWinnings,
+} from "@/lib/supabase/winnings";
 import type {
   MatchOption,
   OnboardingStep,
@@ -124,6 +128,7 @@ export default function Home() {
   const [predictions, setPredictions] = useState<PredictionRecord[]>([]);
   const [leaderboard, setLeaderboard] = useState<TopPlayer[]>([]);
   const [weeklyPoints, setWeeklyPoints] = useState(0);
+  const [winningsBalance, setWinningsBalance] = useState(0);
   const [challengeMatch, setChallengeMatch] = useState("");
   const [challengeStep, setChallengeStep] = useState<
     "setup" | "predict" | "share" | "friend" | "result"
@@ -263,6 +268,7 @@ export default function Home() {
           setDailyMatches([]);
           setLeaderboard([]);
           setWeeklyPoints(0);
+          setWinningsBalance(0);
           setOnboardingStep(1);
           setView("home");
           return;
@@ -297,6 +303,9 @@ export default function Home() {
         if (isMounted) setLeaderboard(weeklyPlayers);
         const currentPoints = await getMyWeeklyPoints(user.id);
         if (isMounted) setWeeklyPoints(currentPoints);
+        await syncMyWeeklyWinnings();
+        const winnings = await getMyWinnings(user.id);
+        if (isMounted) setWinningsBalance(winnings.balance);
         const resultsKey = `panen-co-results-seen-${parisDayKey(new Date())}`;
         const hasFreshDoneResults = savedPredictions.data.some((prediction) => {
           const referenceDate = prediction.matchDate ?? prediction.createdAt;
@@ -498,6 +507,9 @@ export default function Home() {
       setLeaderboard(weeklyPlayers);
       const currentPoints = await getMyWeeklyPoints(currentUserId);
       setWeeklyPoints(currentPoints);
+      await syncMyWeeklyWinnings();
+      const winnings = await getMyWinnings(currentUserId);
+      setWinningsBalance(winnings.balance);
     }
 
     setPredictions((items) =>
@@ -671,12 +683,16 @@ export default function Home() {
         setLeaderboard(weeklyPlayers);
         const currentPoints = await getMyWeeklyPoints(result.data.user.id);
         setWeeklyPoints(currentPoints);
+        await syncMyWeeklyWinnings();
+        const winnings = await getMyWinnings(result.data.user.id);
+        setWinningsBalance(winnings.balance);
       } else {
         setTokens(1);
         setPredictions([]);
         const weeklyPlayers = await getWeeklyLeaderboard(null);
         setLeaderboard(weeklyPlayers);
         setWeeklyPoints(0);
+        setWinningsBalance(0);
       }
       setOnboardingStep("done");
       setView("home");
@@ -730,6 +746,9 @@ export default function Home() {
       setLeaderboard(weeklyPlayers);
       const currentPoints = await getMyWeeklyPoints(result.data.user.id);
       setWeeklyPoints(currentPoints);
+      await syncMyWeeklyWinnings();
+      const winnings = await getMyWinnings(result.data.user.id);
+      setWinningsBalance(winnings.balance);
       setOnboardingStep("done");
       setView("home");
     } finally {
@@ -806,6 +825,7 @@ export default function Home() {
     setPredictions([]);
     setLeaderboard([]);
     setWeeklyPoints(0);
+    setWinningsBalance(0);
     setOnboardingStep("login");
     setView("home");
   }
@@ -909,7 +929,7 @@ export default function Home() {
                 <span className="text-xs font-black uppercase text-[#5f6b7f]">
                   Gains
                 </span>
-                <b>0 &euro;</b>
+                <b>{winningsBalance} &euro;</b>
                 <button
                   className="rounded-full border border-[#d8e2ea] px-3 py-1 text-xs font-black"
                   type="button"

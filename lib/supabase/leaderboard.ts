@@ -9,6 +9,18 @@ type WeeklyScoreRow = {
   reward_euros: number;
 };
 
+export type RankableWeeklyPlayer = {
+  userId?: string;
+  pseudo: string;
+  points: number;
+  isCurrentUser?: boolean;
+  isVirtual?: boolean;
+};
+
+export type RankedWeeklyPlayer = TopPlayer & {
+  userId?: string;
+};
+
 const virtualPseudos = [
   "Lucas Martin",
   "Hugo Bernard",
@@ -498,9 +510,18 @@ function weeklyPseudoPool() {
   return [...recurring, ...weeklyPseudos];
 }
 
-function fillWithVirtualPlayers(players: TopPlayer[]) {
+export function rankWeeklyPlayers(players: RankableWeeklyPlayer[]): RankedWeeklyPlayer[] {
   const usedPseudos = new Set(players.map((player) => player.pseudo));
-  const virtualPlayers: TopPlayer[] = [];
+  const realPlayers: RankedWeeklyPlayer[] = players.map((player, index) => ({
+    rank: index + 1,
+    userId: player.userId,
+    pseudo: player.pseudo,
+    points: player.points,
+    reward: 0,
+    isCurrentUser: Boolean(player.isCurrentUser),
+    isVirtual: Boolean(player.isVirtual),
+  }));
+  const virtualPlayers: RankedWeeklyPlayer[] = [];
 
   for (const pseudo of weeklyPseudoPool()) {
     if (virtualPlayers.length >= 50) break;
@@ -518,7 +539,7 @@ function fillWithVirtualPlayers(players: TopPlayer[]) {
     });
   }
 
-  return [...players, ...virtualPlayers]
+  return [...realPlayers, ...virtualPlayers]
     .sort((left, right) => {
       if (right.points !== left.points) return right.points - left.points;
       if (left.isVirtual === right.isVirtual) return left.pseudo.localeCompare(right.pseudo);
@@ -531,6 +552,10 @@ function fillWithVirtualPlayers(players: TopPlayer[]) {
       reward: rewardForRank(index + 1),
       isCurrentUser: player.isCurrentUser,
     }));
+}
+
+function fillWithVirtualPlayers(players: RankableWeeklyPlayer[]) {
+  return rankWeeklyPlayers(players);
 }
 
 export async function getWeeklyLeaderboard(currentUserId?: string | null) {
@@ -549,12 +574,11 @@ export async function getWeeklyLeaderboard(currentUserId?: string | null) {
     const rank = index + 1;
 
     return {
-      rank,
+      userId: row.user_id,
       pseudo: row.pseudo ?? `Joueur ${rank}`,
       points: row.points,
-      reward: row.reward_euros || rewardForRank(rank),
       isCurrentUser: row.user_id === currentUserId,
-    } satisfies TopPlayer;
+    } satisfies RankableWeeklyPlayer;
   });
 
   return fillWithVirtualPlayers(realPlayers);

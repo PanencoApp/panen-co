@@ -1631,7 +1631,7 @@ export default function Home() {
             setShowWithdrawal(false);
             window.alert(
               result.data.withdrawal.status === "processing"
-                ? "Demande de retrait envoyée. Elle passe en paiement."
+                ? "Retrait validé, vous recevrez l'argent sur votre compte PayPal dans quelques instants."
                 : "Demande de retrait envoyée. Elle passe en vérification.",
             );
           }}

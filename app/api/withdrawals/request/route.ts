@@ -70,9 +70,7 @@ export async function POST(request: NextRequest) {
 
   if (balance < amount) {
     return NextResponse.json(
-      {
-        error: `Solde gains insuffisant pour ce retrait. Compte serveur : ${user.email ?? "email introuvable"} (${user.id}). Solde serveur : ${balance} €, montant demandé : ${amount} €.`,
-      },
+      { error: "Solde gains insuffisant pour ce retrait." },
       { status: 400 },
     );
   }

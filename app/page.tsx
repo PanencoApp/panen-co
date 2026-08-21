@@ -1629,7 +1629,11 @@ export default function Home() {
               ...items,
             ]);
             setShowWithdrawal(false);
-            window.alert("Demande de retrait envoyée. Elle passe en vérification.");
+            window.alert(
+              result.data.withdrawal.status === "processing"
+                ? "Demande de retrait envoyée. Elle passe en paiement."
+                : "Demande de retrait envoyée. Elle passe en vérification.",
+            );
           }}
           userProfile={userProfile}
         />

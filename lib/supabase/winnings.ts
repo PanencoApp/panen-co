@@ -22,6 +22,37 @@ export type AdminWithdrawalRequest = WithdrawalRequest & {
   userPseudo: string;
 };
 
+export type AdminUserOverview = {
+  completedPredictionCount: number;
+  createdAt: string;
+  email: string;
+  emailConfirmed: boolean;
+  id: string;
+  isAdmin: boolean;
+  lastActivityAt: string | null;
+  monthlyPoints: number;
+  predictionCount: number;
+  pseudo: string;
+  subscriptionStatus: string;
+  subscriptionUntil: string | null;
+  weeklyPoints: number;
+  weeklyReward: number;
+};
+
+export type AdminDashboard = {
+  scores: {
+    month: AdminUserOverview[];
+    week: AdminUserOverview[];
+  };
+  summary: {
+    activeSubscriptions: number;
+    totalPredictions: number;
+    totalUsers: number;
+    verifiedEmails: number;
+  };
+  users: AdminUserOverview[];
+};
+
 export async function getMyWinnings(userId: string): Promise<WinningsWallet> {
   if (!supabase) return { balance: 0, totalEarned: 0, withdrawn: 0 };
 
@@ -213,6 +244,38 @@ export async function getAdminWithdrawalRequests() {
 
   return {
     data: (payload?.withdrawals ?? []).map(toAdminWithdrawal),
+    error: null,
+  };
+}
+
+export async function getAdminDashboard() {
+  const token = await getAuthToken();
+
+  if (!token) {
+    return {
+      data: null,
+      error: new Error("Session admin introuvable."),
+    };
+  }
+
+  const response = await fetch("/api/admin/dashboard", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | (AdminDashboard & { error?: string })
+    | null;
+
+  if (!response.ok || !payload) {
+    return {
+      data: null,
+      error: new Error(payload?.error ?? "Impossible de charger l'admin."),
+    };
+  }
+
+  return {
+    data: payload,
     error: null,
   };
 }

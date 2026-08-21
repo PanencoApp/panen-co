@@ -39,12 +39,15 @@ import {
   getWeeklyLeaderboard,
 } from "@/lib/supabase/leaderboard";
 import {
+  getAdminDashboard,
   getAdminWithdrawalRequests,
   getMyWithdrawalRequests,
   getMyWinnings,
   requestWithdrawal,
   syncMyWeeklyWinnings,
   updateAdminWithdrawalStatus,
+  type AdminDashboard,
+  type AdminUserOverview,
   type AdminWithdrawalRequest,
   type WithdrawalRequest,
 } from "@/lib/supabase/winnings";
@@ -2692,6 +2695,10 @@ function ProfileDrawer({
   const [section, setSection] = useState<
     "history" | "subscription" | "security" | "about" | "help" | "admin"
   >("history");
+  const [adminTab, setAdminTab] = useState<
+    "users" | "scores" | "subscriptions" | "withdrawals"
+  >("users");
+  const [adminDashboard, setAdminDashboard] = useState<AdminDashboard | null>(null);
   const [adminWithdrawals, setAdminWithdrawals] = useState<AdminWithdrawalRequest[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -2716,19 +2723,28 @@ function ProfileDrawer({
     ...(isAdmin ? [{ id: "admin", label: "Admin" } as const] : []),
   ] as const;
 
-  async function loadAdminWithdrawals() {
+  async function loadAdminData() {
     if (!isAdmin) return;
 
     setAdminLoading(true);
-    const result = await getAdminWithdrawalRequests();
+    const [dashboard, withdrawals] = await Promise.all([
+      getAdminDashboard(),
+      getAdminWithdrawalRequests(),
+    ]);
     setAdminLoading(false);
 
-    if (result.error) {
-      window.alert(result.error.message);
+    if (dashboard.error) {
+      window.alert(dashboard.error.message);
       return;
     }
 
-    setAdminWithdrawals(result.data);
+    if (withdrawals.error) {
+      window.alert(withdrawals.error.message);
+      return;
+    }
+
+    setAdminDashboard(dashboard.data);
+    setAdminWithdrawals(withdrawals.data);
   }
 
   async function updateWithdrawal(id: string, status: string) {
@@ -2809,8 +2825,8 @@ function ProfileDrawer({
               key={item.id}
               onClick={() => {
                 setSection(item.id);
-                if (item.id === "admin" && adminWithdrawals.length === 0) {
-                  void loadAdminWithdrawals();
+                if (item.id === "admin" && !adminDashboard) {
+                  void loadAdminData();
                 }
               }}
               type="button"
@@ -2970,81 +2986,84 @@ function ProfileDrawer({
           )}
 
           {section === "admin" && isAdmin && (
-            <ProfilePanel title="Admin retraits">
+            <ProfilePanel title="Admin">
               <div className="rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <strong className="block text-lg">Demandes de retrait</strong>
+                    <strong className="block text-lg">Tableau de bord</strong>
                     <span className="text-sm font-bold text-[#4e596b]">
-                      Suivi manuel avant branchement Mangopay ou Lemonway.
+                      Utilisateurs, scores, abonnements et retraits.
                     </span>
                   </div>
                   <button
                     className="rounded-xl border border-[#00baff] px-3 py-2 text-xs font-black uppercase text-[#00baff]"
-                    onClick={loadAdminWithdrawals}
+                    onClick={loadAdminData}
                     type="button"
                   >
                     Actualiser
                   </button>
                 </div>
+                {adminDashboard && (
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <AdminMetric label="Users" value={adminDashboard.summary.totalUsers} />
+                    <AdminMetric label="Emails OK" value={adminDashboard.summary.verifiedEmails} />
+                    <AdminMetric label="Abonnés" value={adminDashboard.summary.activeSubscriptions} />
+                    <AdminMetric label="Prédictions" value={adminDashboard.summary.totalPredictions} />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ["users", "Utilisateurs"],
+                  ["scores", "Scores"],
+                  ["subscriptions", "Abonnements"],
+                  ["withdrawals", "Retraits"],
+                ].map(([id, label]) => (
+                  <button
+                    className={
+                      (adminTab === id
+                        ? "border-[#00baff] bg-[#00baff] text-black"
+                        : "border-[#d9e1ea] bg-white text-[#0b0f19]") +
+                      " h-10 rounded-xl border text-xs font-black uppercase"
+                    }
+                    key={id}
+                    onClick={() => setAdminTab(id as typeof adminTab)}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
               {adminLoading ? (
                 <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
-                  Chargement des retraits...
+                  Chargement admin...
                 </div>
-              ) : adminWithdrawals.length > 0 ? (
-                adminWithdrawals.map((request) => (
-                  <div
-                    className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
-                    key={request.id}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <strong className="block text-lg">
-                          {request.amount} &euro; · {request.userPseudo}
-                        </strong>
-                        <span className="block text-sm font-bold text-[#4e596b]">
-                          {request.userEmail}
-                        </span>
-                        <span className="block text-sm font-bold text-[#4e596b]">
-                          Titulaire : {request.holderName}
-                        </span>
-                        <span className="block text-sm font-bold text-[#4e596b]">
-                          IBAN : ••••{request.ibanLast4}
-                        </span>
-                      </div>
-                      <b className="rounded-xl bg-[#eef3f8] px-3 py-2 text-xs uppercase text-[#4e596b]">
-                        {withdrawalStatusLabel(request.status)}
-                      </b>
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      {[
-                        ["pending", "Vérification"],
-                        ["processing", "Paiement"],
-                        ["paid", "Payé"],
-                        ["rejected", "Refusé"],
-                      ].map(([status, label]) => (
-                        <button
-                          className={
-                            (request.status === status
-                              ? "border-[#00baff] bg-[#00baff] text-black"
-                              : "border-[#d9e1ea] bg-white text-[#0b0f19]") +
-                            " h-10 rounded-xl border text-xs font-black uppercase"
-                          }
-                          key={status}
-                          onClick={() => updateWithdrawal(request.id, status)}
-                          type="button"
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))
+              ) : adminDashboard ? (
+                <>
+                  {adminTab === "users" && (
+                    <AdminUsersList users={adminDashboard.users} />
+                  )}
+                  {adminTab === "scores" && (
+                    <AdminScores
+                      monthlyScores={adminDashboard.scores.month}
+                      weeklyScores={adminDashboard.scores.week}
+                    />
+                  )}
+                  {adminTab === "subscriptions" && (
+                    <AdminSubscriptions users={adminDashboard.users} />
+                  )}
+                  {adminTab === "withdrawals" && (
+                    <AdminWithdrawals
+                      requests={adminWithdrawals}
+                      onUpdate={updateWithdrawal}
+                    />
+                  )}
+                </>
               ) : (
                 <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
-                  Aucune demande de retrait pour le moment.
+                  Appuie sur Actualiser pour charger les données admin.
                 </div>
               )}
             </ProfilePanel>
@@ -3060,6 +3079,259 @@ function ProfileDrawer({
         </button>
       </section>
     </aside>
+  );
+}
+
+function AdminMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-[#d9e1ea] bg-white p-3">
+      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#697386]">
+        {label}
+      </span>
+      <strong className="mt-1 block text-2xl text-[#00baff]">{value}</strong>
+    </div>
+  );
+}
+
+function formatAdminDate(date?: string | null) {
+  if (!date) return "Jamais";
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(date));
+}
+
+function AdminUserCard({ user }: { user: AdminUserOverview }) {
+  return (
+    <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <strong className="block text-lg">{user.pseudo}</strong>
+          <span className="block text-sm font-bold text-[#4e596b]">{user.email}</span>
+          <span className="block text-xs font-black uppercase text-[#697386]">
+            Inscrit le {formatAdminDate(user.createdAt)}
+          </span>
+        </div>
+        <b
+          className={
+            (user.emailConfirmed
+              ? "bg-green-50 text-green-700"
+              : "bg-red-50 text-red-600") +
+            " rounded-xl px-3 py-2 text-xs uppercase"
+          }
+        >
+          {user.emailConfirmed ? "Email OK" : "Email non validé"}
+        </b>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-sm font-bold text-[#4e596b]">
+        <span>{user.predictionCount} prédictions</span>
+        <span>{user.completedPredictionCount} terminées</span>
+        <span>{user.weeklyPoints} pts semaine</span>
+        <span>{user.monthlyPoints} pts mois</span>
+        <span>Abonnement : {subscriptionStatusLabel(user.subscriptionStatus)}</span>
+        <span>Activité : {formatAdminDate(user.lastActivityAt)}</span>
+      </div>
+    </div>
+  );
+}
+
+function AdminUsersList({ users }: { users: AdminUserOverview[] }) {
+  return (
+    <div className="grid gap-3">
+      {users.length > 0 ? (
+        users.map((user) => <AdminUserCard key={user.id} user={user} />)
+      ) : (
+        <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
+          Aucun utilisateur pour le moment.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminScoreRow({
+  points,
+  rank,
+  user,
+}: {
+  points: number;
+  rank: number;
+  user: AdminUserOverview;
+}) {
+  return (
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-[#d9e1ea] bg-white p-3">
+      <b className="grid h-9 w-9 place-items-center rounded-xl bg-[#00baff] text-black">
+        {rank}
+      </b>
+      <span>
+        <strong className="block">{user.pseudo}</strong>
+        <small className="font-bold text-[#4e596b]">{user.email}</small>
+      </span>
+      <b className="text-right text-[#00baff]">{points} pts</b>
+    </div>
+  );
+}
+
+function AdminScores({
+  monthlyScores,
+  weeklyScores,
+}: {
+  monthlyScores: AdminUserOverview[];
+  weeklyScores: AdminUserOverview[];
+}) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-2">
+        <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#4e596b]">
+          Top semaine
+        </h4>
+        {weeklyScores.length > 0 ? (
+          weeklyScores.map((user, index) => (
+            <AdminScoreRow
+              key={`week-${user.id}`}
+              points={user.weeklyPoints}
+              rank={index + 1}
+              user={user}
+            />
+          ))
+        ) : (
+          <EmptyAdminState text="Aucun point marqué cette semaine." />
+        )}
+      </div>
+      <div className="grid gap-2">
+        <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#4e596b]">
+          Top mois
+        </h4>
+        {monthlyScores.length > 0 ? (
+          monthlyScores.map((user, index) => (
+            <AdminScoreRow
+              key={`month-${user.id}`}
+              points={user.monthlyPoints}
+              rank={index + 1}
+              user={user}
+            />
+          ))
+        ) : (
+          <EmptyAdminState text="Aucun point marqué ce mois-ci." />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function subscriptionStatusLabel(status: string) {
+  if (status === "active") return "Actif";
+  if (status === "canceled") return "Annulé";
+  if (status === "past_due") return "Paiement à vérifier";
+  return "Inactif";
+}
+
+function AdminSubscriptions({ users }: { users: AdminUserOverview[] }) {
+  const subscribedUsers = users.filter((user) => user.subscriptionStatus !== "inactive");
+
+  return (
+    <div className="grid gap-3">
+      {subscribedUsers.length > 0 ? (
+        subscribedUsers.map((user) => (
+          <div
+            className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
+            key={`subscription-${user.id}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <strong className="block text-lg">{user.pseudo}</strong>
+                <span className="block text-sm font-bold text-[#4e596b]">
+                  {user.email}
+                </span>
+              </div>
+              <b className="rounded-xl bg-[#eef3f8] px-3 py-2 text-xs uppercase text-[#4e596b]">
+                {subscriptionStatusLabel(user.subscriptionStatus)}
+              </b>
+            </div>
+            <p className="mt-3 text-sm font-bold text-[#4e596b]">
+              Échéance : {formatAdminDate(user.subscriptionUntil)}
+            </p>
+          </div>
+        ))
+      ) : (
+        <EmptyAdminState text="Aucun abonnement actif pour le moment." />
+      )}
+    </div>
+  );
+}
+
+function AdminWithdrawals({
+  onUpdate,
+  requests,
+}: {
+  onUpdate: (id: string, status: string) => void;
+  requests: AdminWithdrawalRequest[];
+}) {
+  return (
+    <div className="grid gap-3">
+      {requests.length > 0 ? (
+        requests.map((request) => (
+          <div
+            className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
+            key={request.id}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <strong className="block text-lg">
+                  {request.amount} &euro; · {request.userPseudo}
+                </strong>
+                <span className="block text-sm font-bold text-[#4e596b]">
+                  {request.userEmail}
+                </span>
+                <span className="block text-sm font-bold text-[#4e596b]">
+                  Titulaire : {request.holderName}
+                </span>
+                <span className="block text-sm font-bold text-[#4e596b]">
+                  IBAN : ••••{request.ibanLast4}
+                </span>
+              </div>
+              <b className="rounded-xl bg-[#eef3f8] px-3 py-2 text-xs uppercase text-[#4e596b]">
+                {withdrawalStatusLabel(request.status)}
+              </b>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {[
+                ["pending", "Vérification"],
+                ["processing", "Paiement"],
+                ["paid", "Payé"],
+                ["rejected", "Refusé"],
+              ].map(([status, label]) => (
+                <button
+                  className={
+                    (request.status === status
+                      ? "border-[#00baff] bg-[#00baff] text-black"
+                      : "border-[#d9e1ea] bg-white text-[#0b0f19]") +
+                    " h-10 rounded-xl border text-xs font-black uppercase"
+                  }
+                  key={status}
+                  onClick={() => onUpdate(request.id, status)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))
+      ) : (
+        <EmptyAdminState text="Aucune demande de retrait pour le moment." />
+      )}
+    </div>
+  );
+}
+
+function EmptyAdminState({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
+      {text}
+    </div>
   );
 }
 

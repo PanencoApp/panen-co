@@ -66,11 +66,15 @@ function seenResultsStorageKey(userId: string) {
   return `panen-co-seen-results-${userId}`;
 }
 
-function readSeenResultIds(userId: string) {
+function watchedResultsStorageKey(userId: string) {
+  return `panen-co-watched-results-${userId}`;
+}
+
+function readStringList(storageKey: string) {
   if (typeof window === "undefined") return [];
 
   try {
-    const rawValue = window.localStorage.getItem(seenResultsStorageKey(userId));
+    const rawValue = window.localStorage.getItem(storageKey);
     const parsedValue = rawValue ? JSON.parse(rawValue) : [];
 
     return Array.isArray(parsedValue)
@@ -81,13 +85,29 @@ function readSeenResultIds(userId: string) {
   }
 }
 
-function saveSeenResultIds(userId: string, resultIds: string[]) {
+function saveStringList(storageKey: string, values: string[]) {
   if (typeof window === "undefined") return;
 
   window.localStorage.setItem(
-    seenResultsStorageKey(userId),
-    JSON.stringify(Array.from(new Set(resultIds))),
+    storageKey,
+    JSON.stringify(Array.from(new Set(values))),
   );
+}
+
+function readSeenResultIds(userId: string) {
+  return readStringList(seenResultsStorageKey(userId));
+}
+
+function saveSeenResultIds(userId: string, resultIds: string[]) {
+  saveStringList(seenResultsStorageKey(userId), resultIds);
+}
+
+function readWatchedResultIds(userId: string) {
+  return readStringList(watchedResultsStorageKey(userId));
+}
+
+function saveWatchedResultIds(userId: string, resultIds: string[]) {
+  saveStringList(watchedResultsStorageKey(userId), resultIds);
 }
 
 const exactScoreOptions = [
@@ -159,6 +179,7 @@ export default function Home() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [seenResultIds, setSeenResultIds] = useState<string[]>([]);
+  const [resultPopupIds, setResultPopupIds] = useState<string[]>([]);
   const [adminTab, setAdminTab] = useState<
     "users" | "scores" | "subscriptions" | "withdrawals"
   >("users");
@@ -188,11 +209,11 @@ export default function Home() {
   const donePredictions = predictions.filter(
     (prediction) => prediction.status === "done",
   );
-  const unseenDonePredictions = donePredictions.filter(
-    (prediction) => !seenResultIds.includes(prediction.id),
+  const popupDonePredictions = donePredictions.filter(
+    (prediction) => resultPopupIds.includes(prediction.id),
   );
-  const homeDonePredictions = unseenDonePredictions;
-  const visibleDonePredictions = unseenDonePredictions;
+  const homeDonePredictions = popupDonePredictions;
+  const visibleDonePredictions = popupDonePredictions;
   const sortedVisibleDonePredictions = [...visibleDonePredictions].sort(
     (left, right) => (right.score ?? 0) - (left.score ?? 0),
   );
@@ -291,6 +312,7 @@ export default function Home() {
           setWinningsBalance(0);
           setWithdrawalRequests([]);
           setSeenResultIds([]);
+          setResultPopupIds([]);
           setOnboardingStep(1);
           setView("home");
           return;
@@ -332,14 +354,30 @@ export default function Home() {
         const withdrawals = await getMyWithdrawalRequests(user.id);
         if (isMounted) setWithdrawalRequests(withdrawals);
         const seenIds = readSeenResultIds(user.id);
-        const hasUnseenDoneResults = savedPredictions.data.some(
-          (prediction) =>
-            prediction.status === "done" && !seenIds.includes(prediction.id),
+        const watchedIds = readWatchedResultIds(user.id);
+        const activeIds = savedPredictions.data
+          .filter((prediction) => prediction.status === "active")
+          .map((prediction) => prediction.id);
+        const nextWatchedIds = Array.from(new Set([...watchedIds, ...activeIds]));
+        const resultIdsToShow = savedPredictions.data
+          .filter(
+            (prediction) =>
+              prediction.status === "done" &&
+              nextWatchedIds.includes(prediction.id) &&
+              !seenIds.includes(prediction.id),
+          )
+          .map((prediction) => prediction.id);
+        const nextSeenIds = Array.from(new Set([...seenIds, ...resultIdsToShow]));
+        const remainingWatchedIds = nextWatchedIds.filter(
+          (id) => !resultIdsToShow.includes(id),
         );
-        setSeenResultIds(seenIds);
+        saveSeenResultIds(user.id, nextSeenIds);
+        saveWatchedResultIds(user.id, remainingWatchedIds);
+        setSeenResultIds(nextSeenIds);
+        setResultPopupIds(resultIdsToShow);
         setOnboardingStep("done");
         setView(
-          hasUnseenDoneResults ? "prediction-done" : "home",
+          resultIdsToShow.length > 0 ? "prediction-done" : "home",
         );
       } finally {
         if (isMounted) setShowSplash(false);
@@ -449,6 +487,12 @@ export default function Home() {
     }
 
     setPredictions((items) => [savedPrediction, ...items]);
+    if (currentUserId) {
+      saveWatchedResultIds(currentUserId, [
+        ...readWatchedResultIds(currentUserId),
+        savedPrediction.id,
+      ]);
+    }
     setSelectedMatch(null);
     setView("prediction-active");
   }
@@ -548,9 +592,22 @@ export default function Home() {
           : prediction,
       ),
     );
+    if (currentUserId) {
+      const watchedIds = readWatchedResultIds(currentUserId);
+      const nextSeenIds = Array.from(new Set([...seenResultIds, id]));
+      saveSeenResultIds(currentUserId, nextSeenIds);
+      saveWatchedResultIds(
+        currentUserId,
+        watchedIds.filter((watchedId) => watchedId !== id),
+      );
+      setSeenResultIds(nextSeenIds);
+      setResultPopupIds(watchedIds.includes(id) ? [id] : []);
+    } else {
+      setResultPopupIds([id]);
+    }
     setSelectedMatch(null);
     setView("prediction-done");
-  }, [currentUserId, dailyMatches, predictions, userProfile.pseudo, weeklyPoints]);
+  }, [currentUserId, dailyMatches, predictions, seenResultIds, userProfile.pseudo, weeklyPoints]);
 
   useEffect(() => {
     const pending = predictions.filter(
@@ -588,6 +645,7 @@ export default function Home() {
       saveSeenResultIds(currentUserId, nextSeenIds);
       setSeenResultIds(Array.from(new Set(nextSeenIds)));
     }
+    setResultPopupIds([]);
     setView("home");
   }
 
@@ -906,6 +964,7 @@ export default function Home() {
     setWinningsBalance(0);
     setWithdrawalRequests([]);
     setSeenResultIds([]);
+    setResultPopupIds([]);
     setAdminDashboard(null);
     setAdminWithdrawals([]);
     setOnboardingStep("login");

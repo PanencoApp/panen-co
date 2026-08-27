@@ -62,20 +62,6 @@ import type {
   View,
 } from "@/types";
 
-function parisDayKey(date: string | Date) {
-  const parts = new Intl.DateTimeFormat("fr-CA", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "Europe/Paris",
-    year: "numeric",
-  }).formatToParts(new Date(date));
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return `${year}-${month}-${day}`;
-}
-
 function isWithinLast24Hours(date?: string) {
   if (!date) return false;
 
@@ -84,6 +70,34 @@ function isWithinLast24Hours(date?: string) {
   if (Number.isNaN(parsedDate.getTime())) return false;
 
   return Date.now() - parsedDate.getTime() <= 24 * 60 * 60 * 1000;
+}
+
+function seenResultsStorageKey(userId: string) {
+  return `panen-co-seen-results-${userId}`;
+}
+
+function readSeenResultIds(userId: string) {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const rawValue = window.localStorage.getItem(seenResultsStorageKey(userId));
+    const parsedValue = rawValue ? JSON.parse(rawValue) : [];
+
+    return Array.isArray(parsedValue)
+      ? parsedValue.filter((value): value is string => typeof value === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSeenResultIds(userId: string, resultIds: string[]) {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(
+    seenResultsStorageKey(userId),
+    JSON.stringify(Array.from(new Set(resultIds))),
+  );
 }
 
 const exactScoreOptions = [
@@ -154,7 +168,7 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
-  const [resultsSeenToday, setResultsSeenToday] = useState(false);
+  const [seenResultIds, setSeenResultIds] = useState<string[]>([]);
   const [adminTab, setAdminTab] = useState<
     "users" | "scores" | "subscriptions" | "withdrawals"
   >("users");
@@ -188,8 +202,11 @@ export default function Home() {
     const referenceDate = prediction.matchDate ?? prediction.createdAt;
     return isWithinLast24Hours(referenceDate);
   });
-  const homeDonePredictions = resultsSeenToday ? [] : recentDonePredictions;
-  const visibleDonePredictions = recentDonePredictions;
+  const unseenRecentDonePredictions = recentDonePredictions.filter(
+    (prediction) => !seenResultIds.includes(prediction.id),
+  );
+  const homeDonePredictions = unseenRecentDonePredictions;
+  const visibleDonePredictions = unseenRecentDonePredictions;
   const sortedVisibleDonePredictions = [...visibleDonePredictions].sort(
     (left, right) => (right.score ?? 0) - (left.score ?? 0),
   );
@@ -287,6 +304,7 @@ export default function Home() {
           setWeeklyPoints(0);
           setWinningsBalance(0);
           setWithdrawalRequests([]);
+          setSeenResultIds([]);
           setOnboardingStep(1);
           setView("home");
           return;
@@ -327,22 +345,20 @@ export default function Home() {
         if (isMounted) setWinningsBalance(winnings.balance);
         const withdrawals = await getMyWithdrawalRequests(user.id);
         if (isMounted) setWithdrawalRequests(withdrawals);
-        const resultsKey = `panen-co-results-seen-${parisDayKey(new Date())}`;
+        const seenIds = readSeenResultIds(user.id);
         const hasFreshDoneResults = savedPredictions.data.some((prediction) => {
           const referenceDate = prediction.matchDate ?? prediction.createdAt;
           return (
             prediction.status === "done" &&
             referenceDate &&
-            isWithinLast24Hours(referenceDate)
+            isWithinLast24Hours(referenceDate) &&
+            !seenIds.includes(prediction.id)
           );
         });
-        const hasSeenResultsToday = window.localStorage.getItem(resultsKey) === "yes";
-        setResultsSeenToday(hasSeenResultsToday);
+        setSeenResultIds(seenIds);
         setOnboardingStep("done");
         setView(
-          hasFreshDoneResults && !hasSeenResultsToday
-            ? "prediction-done"
-            : "home",
+          hasFreshDoneResults ? "prediction-done" : "home",
         );
       } finally {
         if (isMounted) setShowSplash(false);
@@ -583,8 +599,14 @@ export default function Home() {
   }, [currentUserId, predictions, resolvePredictionResult]);
 
   function resetAfterResult() {
-    window.localStorage.setItem(`panen-co-results-seen-${parisDayKey(new Date())}`, "yes");
-    setResultsSeenToday(true);
+    if (currentUserId) {
+      const nextSeenIds = [
+        ...seenResultIds,
+        ...visibleDonePredictions.map((prediction) => prediction.id),
+      ];
+      saveSeenResultIds(currentUserId, nextSeenIds);
+      setSeenResultIds(Array.from(new Set(nextSeenIds)));
+    }
     setView("home");
   }
 
@@ -902,6 +924,7 @@ export default function Home() {
     setWeeklyPoints(0);
     setWinningsBalance(0);
     setWithdrawalRequests([]);
+    setSeenResultIds([]);
     setAdminDashboard(null);
     setAdminWithdrawals([]);
     setOnboardingStep("login");

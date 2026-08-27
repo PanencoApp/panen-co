@@ -1097,7 +1097,7 @@ export default function Home() {
                   </p>
                   <strong className="text-4xl text-[#00baff]">{tokens}</strong>
                   <p className="mt-1 text-xs font-bold text-[#5f6b7f]">
-                    1 jeton gratuit par jour · 5 offerts le 5 du mois
+                    1 jeton gratuit par jour · non cumulable
                   </p>
                 </div>
                 <button

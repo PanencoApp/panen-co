@@ -52,7 +52,7 @@ export function Top50({
         </div>
         <div className="rounded-2xl bg-white px-3 py-2 text-right shadow-[0_8px_18px_rgba(15,23,42,.08)]">
           <span className="block text-[11px] font-black uppercase text-[#697386]">
-            {currentUser ? "Ton rang" : "Points manquants pour intégrer le Top"}
+            {currentUser ? "Ton rang" : "Points manquants"}
           </span>
           <b className="text-sm font-black text-[#0b0f19]">
             {currentUser ? `${currentUser.rank}` : `${pointsToTop50} pts`}

@@ -610,6 +610,31 @@ export default function Home() {
   }, [currentUserId, dailyMatches, predictions, seenResultIds, userProfile.pseudo, weeklyPoints]);
 
   useEffect(() => {
+    if (!currentUserId) return;
+
+    let cancelled = false;
+
+    async function refreshWeeklyLeaderboard() {
+      const [weeklyPlayers, currentPoints] = await Promise.all([
+        getWeeklyLeaderboard(currentUserId),
+        getMyWeeklyPoints(currentUserId),
+      ]);
+
+      if (cancelled) return;
+
+      setLeaderboard(weeklyPlayers);
+      setWeeklyPoints(currentPoints);
+    }
+
+    const interval = window.setInterval(refreshWeeklyLeaderboard, 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
     const pending = predictions.filter(
       (prediction) =>
         prediction.status === "active" &&

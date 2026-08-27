@@ -20,8 +20,29 @@ type ConsumeResult = TokenResult & {
   ok: boolean;
 };
 
+function parisDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("fr-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Paris",
+    year: "numeric",
+  }).formatToParts(date);
+
+  return {
+    day: Number(parts.find((part) => part.type === "day")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+    year: Number(parts.find((part) => part.type === "year")?.value),
+  };
+}
+
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  const { day, month, year } = parisDateParts();
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function dailyFreeTokenAmount() {
+  return parisDateParts().day === 5 ? 5 : 1;
 }
 
 function countAvailableTokens(row: DailyTokenRow) {
@@ -57,6 +78,25 @@ export async function getOrCreateDailyTokens(userId: string): Promise<TokenResul
   }
 
   if (existing.data) {
+    const freeTokens = dailyFreeTokenAmount();
+
+    if (existing.data.free_tokens < freeTokens) {
+      const upgraded = await supabase
+        .from("daily_tokens")
+        .update({ free_tokens: freeTokens })
+        .eq("id", existing.data.id)
+        .select("*")
+        .single();
+
+      if (!upgraded.error) {
+        return {
+          tokens: countAvailableTokens(upgraded.data),
+          row: upgraded.data,
+          error: null,
+        };
+      }
+    }
+
     return {
       tokens: countAvailableTokens(existing.data),
       row: existing.data,
@@ -69,7 +109,7 @@ export async function getOrCreateDailyTokens(userId: string): Promise<TokenResul
     .insert({
       user_id: userId,
       token_date: tokenDate,
-      free_tokens: 1,
+      free_tokens: dailyFreeTokenAmount(),
       ad_tokens: 0,
       subscription_tokens: 0,
       used_tokens: 0,

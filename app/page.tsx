@@ -1097,7 +1097,7 @@ export default function Home() {
                   </p>
                   <strong className="text-4xl text-[#00baff]">{tokens}</strong>
                   <p className="mt-1 text-xs font-bold text-[#5f6b7f]">
-                    1 jeton gratuit par jour · non accumulable
+                    1 jeton gratuit par jour · 5 offerts le 5 du mois
                   </p>
                 </div>
                 <button
@@ -3522,7 +3522,7 @@ function AboutContent() {
       />
       <InfoBlock
         title="Jetons"
-        text="1 jeton gratuit est offert automatiquement chaque jour. Regardez une video publicitaire de 20 secondes pour debloquer +1 jeton. L'abonnement Premium a 9,99 euro / mois debloque les 5 jetons quotidiens sans publicite."
+        text="1 jeton gratuit est offert automatiquement chaque jour. Le 5 du mois, tous les utilisateurs reçoivent 5 jetons gratuits. Regardez une video publicitaire de 20 secondes pour debloquer +1 jeton. L'abonnement Premium a 9,99 euro / mois debloque les 5 jetons quotidiens sans publicite."
       />
       <InfoBlock
         title="Classement Hebdomadaire"

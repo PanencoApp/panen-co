@@ -1745,16 +1745,16 @@ export default function Home() {
 function SplashScreen() {
   return (
     <main className="flex h-screen flex-col items-center justify-center overflow-hidden bg-black px-8 text-white">
-      <div className="grid flex-1 place-items-center pb-32">
-        <div className="grid h-28 w-[245px] place-items-center bg-black">
-          <Image
-            alt="Panen&Co"
-            className="h-auto w-full animate-[splash-fade_1.2s_ease-out_forwards] object-contain opacity-0"
-            height={112}
-            priority
-            src="/panen-co-big-logo.png"
-            width={245}
-            unoptimized
+      <div className="grid flex-1 place-items-center pb-28">
+        <div className="grid h-40 w-40 place-items-center overflow-hidden bg-black">
+          <video
+            aria-label="Panen&Co"
+            autoPlay
+            className="h-full w-full animate-[splash-fade_.8s_ease-out_forwards] object-contain opacity-0"
+            muted
+            playsInline
+            preload="auto"
+            src="/panen-co-splash.mp4"
           />
         </div>
       </div>

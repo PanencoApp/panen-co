@@ -401,6 +401,38 @@ const virtualPseudos = [
   "EvaLucarne",
   "NolanDerby",
   "ArielScore",
+  "James Carter",
+  "Oliver Bennett",
+  "Mason Taylor",
+  "Noah Wilson",
+  "Ethan Walker",
+  "Liam Cooper",
+  "Jack Harrison",
+  "Leo Turner",
+  "Harry Collins",
+  "Charlie Brooks",
+  "Carlos Ramirez",
+  "Diego Torres",
+  "Santiago Vega",
+  "Mateo Alvarez",
+  "Luis Herrera",
+  "Javier Moreno",
+  "Pablo Castillo",
+  "Nico Fernandez",
+  "Tomas Navarro",
+  "Andres Molina",
+  "the_final_whistle",
+  "box_to_box_ben",
+  "clean_sheet_jack",
+  "last_minute_goal",
+  "away_day_ollie",
+  "corner_taken_quick",
+  "el_mago_del_gol",
+  "la_banda_del_var",
+  "gol_de_oro_fc",
+  "pase_filtrado",
+  "nueve_clasico",
+  "cancha_caliente",
 ];
 
 const recurringContenders = [
@@ -420,6 +452,9 @@ const recurringContenders = [
   "MaxDuFoot",
   "MisterVAR",
   "Lucarne7",
+  "Carlos Ramirez",
+  "the_final_whistle",
+  "el_mago_del_gol",
 ];
 
 function parisDateParts(date = new Date()) {
@@ -485,11 +520,17 @@ export function estimateGlobalRank(points: number, seedKey = "") {
   return 1000;
 }
 
+function weeklyTopVirtualScore() {
+  return 235 + (stableNumber(`top-${currentWeekStart()}`) % 24);
+}
+
 function virtualScore(rank: number) {
-  if (rank === 1) return 250;
-  if (rank <= 3) return 245 - rank * 4;
-  if (rank <= 10) return 225 - rank * 5 - ((rank * 3) % 4);
-  if (rank <= 30) return 190 - rank * 3 - ((rank * 5) % 7);
+  const topScore = weeklyTopVirtualScore();
+
+  if (rank === 1) return topScore;
+  if (rank <= 3) return topScore - 5 - rank * 3 - ((rank * 5) % 3);
+  if (rank <= 10) return Math.max(150, topScore - 20 - rank * 5 - ((rank * 3) % 5));
+  if (rank <= 30) return Math.max(92, topScore - 75 - rank * 2 - ((rank * 5) % 7));
   return Math.max(70, 125 - rank - ((rank * 7) % 6));
 }
 

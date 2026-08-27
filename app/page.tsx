@@ -308,7 +308,7 @@ export default function Home() {
       try {
         const [result] = await Promise.all([
           getCurrentUser(),
-          new Promise((resolve) => window.setTimeout(resolve, 1800)),
+          new Promise((resolve) => window.setTimeout(resolve, 1200)),
         ]);
         const user = result.data.user;
 
@@ -1744,9 +1744,9 @@ export default function Home() {
 
 function SplashScreen() {
   return (
-    <main className="flex h-screen flex-col items-center justify-center overflow-hidden bg-black px-8 text-white">
-      <div className="grid flex-1 place-items-center pb-28">
-        <div className="grid h-40 w-40 place-items-center overflow-hidden bg-black">
+    <main className="relative grid h-screen place-items-center overflow-hidden bg-black px-8 text-white">
+      <div className="grid place-items-center">
+        <div className="grid h-44 w-44 place-items-center overflow-hidden bg-black">
           <video
             aria-label="Panen&Co"
             autoPlay
@@ -1758,8 +1758,8 @@ function SplashScreen() {
           />
         </div>
       </div>
-      <div className="mb-10 h-1.5 w-full max-w-[380px] overflow-hidden rounded-full bg-white/10">
-        <div className="h-full w-full origin-left animate-[splash-load_1.8s_ease-out_forwards] rounded-full bg-[#00baff]" />
+      <div className="absolute bottom-10 left-8 right-8 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full w-full origin-left animate-[splash-load_1.2s_ease-out_forwards] rounded-full bg-[#00baff]" />
       </div>
     </main>
   );

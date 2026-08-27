@@ -822,6 +822,28 @@ export default function Home() {
     setChallengeCopied(true);
   }
 
+  async function shareChallengeLink() {
+    const shareText = `${challengeOwnerPseudo} te défie sur Panen&Co : ${selectedChallenge.label}. Enjeu : ${challengeStake || "pour la gloire"}.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          text: shareText,
+          title: "Défi Panen&Co",
+          url: challengeLink,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(challengeLink);
+      setChallengeCopied(true);
+      window.alert("Lien copié, prêt à partager.");
+    } catch {
+      await navigator.clipboard.writeText(challengeLink);
+      setChallengeCopied(true);
+    }
+  }
+
   function readPickFromForm(form: HTMLFormElement): PredictionPick {
     const data = new FormData(form);
 
@@ -1768,6 +1790,7 @@ export default function Home() {
                 friendPseudo={challengeFriendPseudo}
                 matchLabel={selectedChallenge.label}
                 onCopy={copyChallengeLink}
+                onShare={shareChallengeLink}
                 ownerPseudo={challengeOwnerPseudo}
                 playerPick={challengePick}
                 stake={challengeStake}
@@ -1785,28 +1808,15 @@ export default function Home() {
                     stake={challengeStake}
                   />
                 ) : (
-                  <>
-                    <ChallengeInProgressCard
-                      challengeLink={challengeLink}
-                      copied={challengeCopied}
-                      friendPick={friendPick}
-                      friendPseudo={challengeFriendPseudo || userProfile.pseudo}
-                      matchLabel={selectedChallenge.label}
-                      onCopy={copyChallengeLink}
-                      ownerPseudo={challengeOwnerPseudo}
-                      playerPick={challengePick}
-                      stake={challengeStake}
-                    />
-                    <ChallengePredictionForm
-                      match={selectedChallenge.label}
-                      matchOption={selectedChallenge}
-                      onBack={() => setIsSharedChallengeGuest(true)}
-                      onSubmit={submitFriendPrediction}
-                      players={challengePlayers}
-                      submitLabel="Valider mes predictions"
-                      title="Mes predictions"
-                    />
-                  </>
+                  <ChallengePredictionForm
+                    match={selectedChallenge.label}
+                    matchOption={selectedChallenge}
+                    onBack={() => setIsSharedChallengeGuest(true)}
+                    onSubmit={submitFriendPrediction}
+                    players={challengePlayers}
+                    submitLabel="Valider mes predictions"
+                    title="Mes predictions"
+                  />
                 )}
               </section>
             )}
@@ -2620,6 +2630,7 @@ function ChallengeInProgressCard({
   challengeLink,
   copied,
   onCopy,
+  onShare,
   ownerPseudo,
   stake,
 }: {
@@ -2630,6 +2641,7 @@ function ChallengeInProgressCard({
   challengeLink: string;
   copied: boolean;
   onCopy: () => void;
+  onShare: () => void;
   ownerPseudo: string;
   stake: string;
 }) {
@@ -2659,13 +2671,23 @@ function ChallengeInProgressCard({
           <div className="mt-4 rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-sm font-bold text-[#4e596b]">
             {challengeLink}
           </div>
-          <button
-            className="mt-3 h-12 w-full rounded-2xl border border-[#00baff] font-black uppercase text-[#00baff]"
-            onClick={onCopy}
-            type="button"
-          >
-            {copied ? "Lien copie" : "Copier le lien"}
-          </button>
+          <div className="mt-3 grid grid-cols-[1fr_auto] gap-3">
+            <button
+              className="h-12 rounded-2xl border border-[#00baff] font-black uppercase text-[#00baff]"
+              onClick={onCopy}
+              type="button"
+            >
+              {copied ? "Lien copie" : "Copier le lien"}
+            </button>
+            <button
+              aria-label="Partager le défi"
+              className="grid h-12 w-12 place-items-center rounded-2xl bg-[#00baff] text-xl font-black text-black"
+              onClick={onShare}
+              type="button"
+            >
+              ↗
+            </button>
+          </div>
         </>
       )}
     </section>

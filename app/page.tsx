@@ -1713,9 +1713,8 @@ export default function Home() {
         {view === "challenge" && (
           <section className="space-y-4">
             <Header
-              title={"D\u00e9fi gratuit"}
-              subtitle={"5 matchs du jour · sans jeton"}
-              right={`${tokens} jeton${tokens > 1 ? "s" : ""}`}
+              title="Défi amical"
+              subtitle="Montre qui est le grand connaisseur."
               onBack={() => setView("home")}
             />
 

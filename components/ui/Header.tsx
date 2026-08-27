@@ -1,7 +1,7 @@
 type HeaderProps = {
   title: string;
   subtitle: string;
-  right: string;
+  right?: string;
   onBack: () => void;
 };
 
@@ -21,7 +21,7 @@ export function Header({ title, subtitle, right, onBack }: HeaderProps) {
           {subtitle}
         </span>
       </div>
-      <p className="font-black">{right}</p>
+      {right ? <p className="font-black">{right}</p> : <span aria-hidden="true" />}
     </header>
   );
 }

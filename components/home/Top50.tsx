@@ -18,7 +18,21 @@ function currentWeekLabel() {
   return `${formatDate(monday)} au ${formatDate(sunday)}`;
 }
 
-export function Top50({ players }: { players: TopPlayer[] }) {
+export function Top50({
+  players,
+  userPoints,
+}: {
+  players: TopPlayer[];
+  userPoints: number;
+}) {
+  const currentUser = players.find((player) => player.isCurrentUser);
+  const fiftiethPlayer = players.find((player) => player.rank === 50);
+  const displayedPoints = Math.max(userPoints, currentUser?.points ?? 0);
+  const pointsToTop50 = Math.max(
+    0,
+    (fiftiethPlayer?.points ?? 0) - displayedPoints + 1,
+  );
+
   return (
     <section className="rounded-3xl border border-[#d9e1ea] bg-white p-4">
       <div className="mb-3 flex items-end justify-between gap-3">
@@ -26,6 +40,24 @@ export function Top50({ players }: { players: TopPlayer[] }) {
         <span className="text-right text-[11px] font-black uppercase text-[#697386]">
           {currentWeekLabel()} - reset dimanche 00:00
         </span>
+      </div>
+      <div className="mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-[#00baff]/40 bg-[#eefaff] p-3">
+        <div>
+          <span className="text-[11px] font-black uppercase tracking-[0.14em] text-[#4e596b]">
+            Ton score actuel
+          </span>
+          <strong className="mt-1 block text-3xl font-black text-[#00baff]">
+            {displayedPoints} pts
+          </strong>
+        </div>
+        <div className="rounded-2xl bg-white px-3 py-2 text-right shadow-[0_8px_18px_rgba(15,23,42,.08)]">
+          <span className="block text-[11px] font-black uppercase text-[#697386]">
+            {currentUser ? "Ton rang" : "À gagner"}
+          </span>
+          <b className="text-sm font-black text-[#0b0f19]">
+            {currentUser ? `${currentUser.rank}` : `+${pointsToTop50} pts`}
+          </b>
+        </div>
       </div>
       <div className="grid max-h-[420px] gap-2 overflow-auto pr-1">
         {players.map((player) => (

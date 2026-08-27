@@ -1138,7 +1138,7 @@ export default function Home() {
               )}
             </section>
 
-            <Top50 players={leaderboard} />
+            <Top50 players={leaderboard} userPoints={weeklyPoints} />
 
             <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5 text-center">
               <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-3xl border border-[#00baff] bg-[#eefaff] shadow-[0_0_26px_rgba(0,186,255,.16)]">
@@ -1524,7 +1524,7 @@ export default function Home() {
             >
               Retour accueil
             </button>
-            <Top50 players={leaderboard} />
+            <Top50 players={leaderboard} userPoints={displayedWeeklyPoints} />
           </section>
         )}
 

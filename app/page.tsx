@@ -624,11 +624,12 @@ export default function Home() {
     if (!currentUserId) return;
 
     let cancelled = false;
+    const userId = currentUserId;
 
     async function refreshWeeklyLeaderboard() {
       const [weeklyPlayers, currentPoints] = await Promise.all([
-        getWeeklyLeaderboard(currentUserId),
-        getMyWeeklyPoints(currentUserId),
+        getWeeklyLeaderboard(userId),
+        getMyWeeklyPoints(userId),
       ]);
 
       if (cancelled) return;

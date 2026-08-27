@@ -223,7 +223,8 @@ export default function Home() {
   const [friendPick, setFriendPick] = useState<PredictionPick | null>(null);
   const [challengeStake, setChallengeStake] = useState("Un verre ce week-end");
   const [challengeOwnerPseudo, setChallengeOwnerPseudo] = useState(defaultProfile.pseudo);
-  const [challengeFriendPseudo, setChallengeFriendPseudo] = useState("Malo7");
+  const [challengeFriendPseudo, setChallengeFriendPseudo] = useState("");
+  const [isSharedChallengeGuest, setIsSharedChallengeGuest] = useState(false);
   const [pendingSharedChallenge, setPendingSharedChallenge] =
     useState<SharedChallenge | null>(null);
   const [challengeCopied, setChallengeCopied] = useState(false);
@@ -351,6 +352,7 @@ export default function Home() {
       setChallengeStake(sharedChallenge.stake || "pour la gloire");
       setChallengeOwnerPseudo(sharedChallenge.from || "Ton ami");
       setChallengeFriendPseudo(friendPseudo || "Ami");
+      setIsSharedChallengeGuest(true);
       setChallengeCopied(false);
       setPendingSharedChallenge(null);
       setOnboardingStep("done");
@@ -838,6 +840,8 @@ export default function Home() {
     setChallengePick(readPickFromForm(event.currentTarget));
     setChallengeOwnerPseudo(userProfile.pseudo);
     setFriendPick(null);
+    setChallengeFriendPseudo("");
+    setIsSharedChallengeGuest(false);
     setChallengeCopied(false);
     setChallengeStep("share");
   }
@@ -845,6 +849,7 @@ export default function Home() {
   function submitFriendPrediction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFriendPick(readPickFromForm(event.currentTarget));
+    setChallengeFriendPseudo(userProfile.pseudo);
     setChallengeStep("result");
   }
 
@@ -854,7 +859,8 @@ export default function Home() {
     setFriendPick(null);
     setChallengeStake("Un verre ce week-end");
     setChallengeOwnerPseudo(userProfile.pseudo);
-    setChallengeFriendPseudo("Malo7");
+    setChallengeFriendPseudo("");
+    setIsSharedChallengeGuest(false);
     setChallengeCopied(false);
     setChallengeStep("setup");
   }
@@ -1764,30 +1770,44 @@ export default function Home() {
                 onCopy={copyChallengeLink}
                 ownerPseudo={challengeOwnerPseudo}
                 playerPick={challengePick}
+                stake={challengeStake}
               />
             )}
 
             {challengeStep === "friend" && challengePick && (
               <section className="space-y-4">
-                <ChallengeInProgressCard
-                  challengeLink={challengeLink}
-                  copied={challengeCopied}
-                  friendPick={friendPick}
-                  friendPseudo={challengeFriendPseudo}
-                  matchLabel={selectedChallenge.label}
-                  onCopy={copyChallengeLink}
-                  ownerPseudo={challengeOwnerPseudo}
-                  playerPick={challengePick}
-                />
-                <ChallengePredictionForm
-                  match={selectedChallenge.label}
-                  matchOption={selectedChallenge}
-                  onBack={() => setChallengeStep("share")}
-                  onSubmit={submitFriendPrediction}
-                  players={challengePlayers}
-                  submitLabel="Valider les predictions ami"
-                  title={`Predictions de ${challengeFriendPseudo}`}
-                />
+                {isSharedChallengeGuest ? (
+                  <ChallengeAcceptCard
+                    matchLabel={selectedChallenge.label}
+                    onAccept={() => setIsSharedChallengeGuest(false)}
+                    ownerPick={challengePick}
+                    ownerPseudo={challengeOwnerPseudo}
+                    stake={challengeStake}
+                  />
+                ) : (
+                  <>
+                    <ChallengeInProgressCard
+                      challengeLink={challengeLink}
+                      copied={challengeCopied}
+                      friendPick={friendPick}
+                      friendPseudo={challengeFriendPseudo || userProfile.pseudo}
+                      matchLabel={selectedChallenge.label}
+                      onCopy={copyChallengeLink}
+                      ownerPseudo={challengeOwnerPseudo}
+                      playerPick={challengePick}
+                      stake={challengeStake}
+                    />
+                    <ChallengePredictionForm
+                      match={selectedChallenge.label}
+                      matchOption={selectedChallenge}
+                      onBack={() => setIsSharedChallengeGuest(true)}
+                      onSubmit={submitFriendPrediction}
+                      players={challengePlayers}
+                      submitLabel="Valider mes predictions"
+                      title="Mes predictions"
+                    />
+                  </>
+                )}
               </section>
             )}
 
@@ -2601,6 +2621,7 @@ function ChallengeInProgressCard({
   copied,
   onCopy,
   ownerPseudo,
+  stake,
 }: {
   matchLabel: string;
   playerPick: PredictionPick;
@@ -2610,6 +2631,7 @@ function ChallengeInProgressCard({
   copied: boolean;
   onCopy: () => void;
   ownerPseudo: string;
+  stake: string;
 }) {
   return (
     <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5">
@@ -2617,6 +2639,9 @@ function ChallengeInProgressCard({
         Defi en cours
       </p>
       <h2 className="mt-1 text-xl font-black">{matchLabel}</h2>
+      <p className="mt-2 rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-sm font-bold text-[#4e596b]">
+        Enjeu : {stake || "pour la gloire"}
+      </p>
       <div className="mt-4 grid gap-3">
         <PredictionSideCard
           label={ownerPseudo}
@@ -2624,9 +2649,9 @@ function ChallengeInProgressCard({
           status="Predictions posees"
         />
         <PredictionSideCard
-          label={friendPseudo}
+          label={friendPick ? friendPseudo : "Ton ami"}
           pick={friendPick}
-          status={friendPick ? "Predictions posees" : "En attente"}
+          status={friendPick ? "Predictions posees" : "En attente du lien"}
         />
       </div>
       {!friendPick && (
@@ -2643,6 +2668,44 @@ function ChallengeInProgressCard({
           </button>
         </>
       )}
+    </section>
+  );
+}
+
+function ChallengeAcceptCard({
+  matchLabel,
+  ownerPick,
+  ownerPseudo,
+  stake,
+  onAccept,
+}: {
+  matchLabel: string;
+  ownerPick: PredictionPick;
+  ownerPseudo: string;
+  stake: string;
+  onAccept: () => void;
+}) {
+  return (
+    <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5">
+      <p className="text-xs font-black uppercase text-[#00baff]">
+        Defi recu
+      </p>
+      <h2 className="mt-1 text-xl font-black">{matchLabel}</h2>
+      <p className="mt-3 rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-sm font-bold text-[#4e596b]">
+        {ownerPseudo} te défie pour : {stake || "pour la gloire"}
+      </p>
+      <PredictionSideCard
+        label={ownerPseudo}
+        pick={ownerPick}
+        status="Predictions posees"
+      />
+      <button
+        className="mt-4 h-12 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black"
+        onClick={onAccept}
+        type="button"
+      >
+        Accepter le défi
+      </button>
     </section>
   );
 }

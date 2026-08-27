@@ -150,6 +150,11 @@ function formatMatchDateTime(date?: string, fallback?: string) {
 }
 
 export default function Home() {
+  const [isOnboardingPreview] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("preview") === "onboarding",
+  );
   const [showSplash, setShowSplash] = useState(true);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(1);
   const [view, setView] = useState<View>("home");
@@ -294,6 +299,12 @@ export default function Home() {
       setShowTokens(false);
       setShowProfile(false);
 
+      if (isOnboardingPreview) {
+        setOnboardingStep(1);
+        setShowSplash(false);
+        return;
+      }
+
       try {
         const [result] = await Promise.all([
           getCurrentUser(),
@@ -389,7 +400,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isOnboardingPreview]);
 
   function openMatches() {
     setSelectedMatch(null);
@@ -1850,8 +1861,8 @@ function Onboarding({
                 Pr&eacute;dire. Grimper. R&eacute;colter.
               </h1>
               <p className="mt-5 max-w-[330px] text-sm font-bold leading-5 text-white">
-                Rejoignez plus de 500 passionn&eacute;s chaque jour,
-                int&eacute;grez le Top 100 mondial et d&eacute;bloquez les
+                Rejoignez plus de 500 passionn&eacute;s de football chaque jour,
+                int&eacute;grez le Top 50 mondial et d&eacute;bloquez les
                 r&eacute;compenses de la semaine.
               </p>
 

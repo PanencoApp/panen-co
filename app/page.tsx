@@ -62,16 +62,6 @@ import type {
   View,
 } from "@/types";
 
-function isWithinLast24Hours(date?: string) {
-  if (!date) return false;
-
-  const parsedDate = new Date(date);
-
-  if (Number.isNaN(parsedDate.getTime())) return false;
-
-  return Date.now() - parsedDate.getTime() <= 24 * 60 * 60 * 1000;
-}
-
 function seenResultsStorageKey(userId: string) {
   return `panen-co-seen-results-${userId}`;
 }
@@ -198,15 +188,11 @@ export default function Home() {
   const donePredictions = predictions.filter(
     (prediction) => prediction.status === "done",
   );
-  const recentDonePredictions = donePredictions.filter((prediction) => {
-    const referenceDate = prediction.matchDate ?? prediction.createdAt;
-    return isWithinLast24Hours(referenceDate);
-  });
-  const unseenRecentDonePredictions = recentDonePredictions.filter(
+  const unseenDonePredictions = donePredictions.filter(
     (prediction) => !seenResultIds.includes(prediction.id),
   );
-  const homeDonePredictions = unseenRecentDonePredictions;
-  const visibleDonePredictions = unseenRecentDonePredictions;
+  const homeDonePredictions = unseenDonePredictions;
+  const visibleDonePredictions = unseenDonePredictions;
   const sortedVisibleDonePredictions = [...visibleDonePredictions].sort(
     (left, right) => (right.score ?? 0) - (left.score ?? 0),
   );
@@ -346,19 +332,14 @@ export default function Home() {
         const withdrawals = await getMyWithdrawalRequests(user.id);
         if (isMounted) setWithdrawalRequests(withdrawals);
         const seenIds = readSeenResultIds(user.id);
-        const hasFreshDoneResults = savedPredictions.data.some((prediction) => {
-          const referenceDate = prediction.matchDate ?? prediction.createdAt;
-          return (
-            prediction.status === "done" &&
-            referenceDate &&
-            isWithinLast24Hours(referenceDate) &&
-            !seenIds.includes(prediction.id)
-          );
-        });
+        const hasUnseenDoneResults = savedPredictions.data.some(
+          (prediction) =>
+            prediction.status === "done" && !seenIds.includes(prediction.id),
+        );
         setSeenResultIds(seenIds);
         setOnboardingStep("done");
         setView(
-          hasFreshDoneResults ? "prediction-done" : "home",
+          hasUnseenDoneResults ? "prediction-done" : "home",
         );
       } finally {
         if (isMounted) setShowSplash(false);

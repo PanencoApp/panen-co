@@ -31,6 +31,13 @@ import {
   getMyPredictions,
   savePrediction,
 } from "@/lib/supabase/predictions";
+import {
+  createFriendChallenge,
+  getFriendChallenge,
+  joinFriendChallenge,
+  settleFriendChallenge,
+  type FriendChallenge,
+} from "@/lib/supabase/challenges";
 import { getTodayMatches } from "@/lib/supabase/matches";
 import {
   addWeeklyPoints,
@@ -150,6 +157,7 @@ function formatMatchDateTime(date?: string, fallback?: string) {
 }
 
 type SharedChallenge = {
+  challengeId?: string;
   from: string;
   matchId: string;
   matchLabel: string;
@@ -221,6 +229,8 @@ export default function Home() {
   >("setup");
   const [challengePick, setChallengePick] = useState<PredictionPick | null>(null);
   const [friendPick, setFriendPick] = useState<PredictionPick | null>(null);
+  const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
+  const [challengeResult, setChallengeResult] = useState<FriendChallenge | null>(null);
   const [challengeStake, setChallengeStake] = useState("Un verre ce week-end");
   const [challengeOwnerPseudo, setChallengeOwnerPseudo] = useState(defaultProfile.pseudo);
   const [challengeFriendPseudo, setChallengeFriendPseudo] = useState("");
@@ -260,6 +270,7 @@ export default function Home() {
   );
   const challengeLink = challengePick
     ? buildSharedChallengeLink({
+        challengeId: activeChallengeId ?? undefined,
         from: challengeOwnerPseudo,
         matchId: challengeMatch,
         matchLabel: selectedChallenge.label,
@@ -326,37 +337,60 @@ export default function Home() {
   }
 
   const openSharedChallenge = useCallback(
-    (
+    async (
       sharedChallenge: SharedChallenge,
       matches: MatchOption[],
       friendPseudo = "Ami",
     ) => {
+      let shared = sharedChallenge;
+      let loadedChallenge: FriendChallenge | null = null;
+
+      if (sharedChallenge.challengeId) {
+        const savedChallenge = await getFriendChallenge(sharedChallenge.challengeId);
+
+        if (savedChallenge.data) {
+          loadedChallenge = savedChallenge.data;
+          shared = {
+            challengeId: savedChallenge.data.id,
+            from: savedChallenge.data.creatorPseudo,
+            matchId: savedChallenge.data.matchId,
+            matchLabel: savedChallenge.data.matchLabel,
+            pick: savedChallenge.data.creatorPick,
+            stake: savedChallenge.data.stake,
+          };
+          setChallengeResult(
+            savedChallenge.data.status === "done" ? savedChallenge.data : null,
+          );
+          setFriendPick(savedChallenge.data.friendPick ?? null);
+        }
+      }
+
       const hasSharedMatch = matches.some(
-        (match) => match.id === sharedChallenge.matchId,
+        (match) => match.id === shared.matchId,
       );
       const nextMatches = hasSharedMatch
         ? matches
         : [
             {
-              id: sharedChallenge.matchId,
-              label: sharedChallenge.matchLabel,
+              id: shared.matchId,
+              label: shared.matchLabel,
               time: "Défi partagé",
             },
             ...matches,
           ];
 
       setDailyMatches(nextMatches);
-      setChallengeMatch(sharedChallenge.matchId);
-      setChallengePick(sharedChallenge.pick);
-      setFriendPick(null);
-      setChallengeStake(sharedChallenge.stake || "pour la gloire");
-      setChallengeOwnerPseudo(sharedChallenge.from || "Ton ami");
+      setActiveChallengeId(shared.challengeId ?? null);
+      setChallengeMatch(shared.matchId);
+      setChallengePick(shared.pick);
+      setChallengeStake(shared.stake || "pour la gloire");
+      setChallengeOwnerPseudo(shared.from || "Ton ami");
       setChallengeFriendPseudo(friendPseudo || "Ami");
       setIsSharedChallengeGuest(true);
       setChallengeCopied(false);
       setPendingSharedChallenge(null);
       setOnboardingStep("done");
-      setChallengeStep("friend");
+      setChallengeStep(loadedChallenge?.status === "done" ? "result" : "friend");
       setView("challenge");
 
       if (typeof window !== "undefined") {
@@ -489,7 +523,7 @@ export default function Home() {
         setSeenResultIds(nextSeenIds);
         setResultPopupIds(resultIdsToShow);
         if (sharedChallenge) {
-          openSharedChallenge(sharedChallenge, todayMatches.data, pseudo);
+          await openSharedChallenge(sharedChallenge, todayMatches.data, pseudo);
         } else {
           setOnboardingStep("done");
           setView(
@@ -857,9 +891,33 @@ export default function Home() {
     };
   }
 
-  function submitChallengePrediction(event: React.FormEvent<HTMLFormElement>) {
+  async function submitChallengePrediction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setChallengePick(readPickFromForm(event.currentTarget));
+    const pick = readPickFromForm(event.currentTarget);
+
+    if (!currentUserId) {
+      window.alert("Connecte-toi pour générer un lien de défi.");
+      return;
+    }
+
+    const created = await createFriendChallenge({
+      match: selectedChallenge,
+      pick,
+      pseudo: userProfile.pseudo,
+      stake: challengeStake,
+      userId: currentUserId,
+    });
+
+    if (created.error || !created.data) {
+      window.alert(
+        created.error?.message ?? "Impossible de générer le défi pour le moment.",
+      );
+      return;
+    }
+
+    setActiveChallengeId(created.data.id);
+    setChallengeResult(null);
+    setChallengePick(pick);
     setChallengeOwnerPseudo(userProfile.pseudo);
     setFriendPick(null);
     setChallengeFriendPseudo("");
@@ -868,12 +926,88 @@ export default function Home() {
     setChallengeStep("share");
   }
 
-  function submitFriendPrediction(event: React.FormEvent<HTMLFormElement>) {
+  async function submitFriendPrediction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFriendPick(readPickFromForm(event.currentTarget));
+    const pick = readPickFromForm(event.currentTarget);
+
+    if (!currentUserId) {
+      window.alert("Connecte-toi pour accepter le défi.");
+      return;
+    }
+
+    if (activeChallengeId) {
+      const joined = await joinFriendChallenge({
+        challengeId: activeChallengeId,
+        pick,
+        pseudo: userProfile.pseudo,
+        userId: currentUserId,
+      });
+
+      if (joined.error || !joined.data) {
+        window.alert(
+          joined.error?.message ?? "Impossible de rejoindre ce défi pour le moment.",
+        );
+        return;
+      }
+
+      setChallengeResult(joined.data.status === "done" ? joined.data : null);
+      setChallengePick(joined.data.creatorPick);
+      setFriendPick(joined.data.friendPick ?? pick);
+      setChallengeOwnerPseudo(joined.data.creatorPseudo);
+      setChallengeFriendPseudo(joined.data.friendPseudo ?? userProfile.pseudo);
+      setChallengeStep(joined.data.status === "done" ? "result" : "share");
+      return;
+    }
+
+    setFriendPick(pick);
     setChallengeFriendPseudo(userProfile.pseudo);
     setChallengeStep("share");
   }
+
+  const resolveFriendChallengeResult = useCallback(async (options?: { silent?: boolean }) => {
+    if (!activeChallengeId) return;
+
+    const settled = await settleFriendChallenge(activeChallengeId);
+
+    if (settled.error) {
+      if (!options?.silent) {
+        window.alert(settled.error.message);
+      }
+      return;
+    }
+
+    if (!settled.data) return;
+
+    setChallengePick(settled.data.creatorPick);
+    setFriendPick(settled.data.friendPick ?? null);
+    setChallengeOwnerPseudo(settled.data.creatorPseudo);
+    setChallengeFriendPseudo(settled.data.friendPseudo ?? "");
+
+    if (settled.data.status === "done") {
+      setChallengeResult(settled.data);
+      setChallengeStep("result");
+    } else if (!options?.silent) {
+      window.alert(
+        "Ce match n'est pas encore terminé. Le défi reste en cours.",
+      );
+    }
+  }, [activeChallengeId]);
+
+  useEffect(() => {
+    if (!activeChallengeId || !friendPick || challengeStep !== "share") return;
+
+    const timeout = window.setTimeout(() => {
+      void resolveFriendChallengeResult({ silent: true });
+    }, 0);
+    const interval = window.setInterval(() => {
+      void resolveFriendChallengeResult({ silent: true });
+    }, 5 * 60 * 1000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [activeChallengeId, challengeStep, friendPick, resolveFriendChallengeResult]);
 
   async function loadAdminData() {
     if (!userProfile.isAdmin) return;
@@ -988,7 +1122,7 @@ export default function Home() {
       const sharedChallenge = pendingSharedChallenge ?? readSharedChallengeFromUrl();
 
       if (sharedChallenge) {
-        openSharedChallenge(sharedChallenge, todayMatches.data, pseudo);
+        await openSharedChallenge(sharedChallenge, todayMatches.data, pseudo);
       } else {
         setOnboardingStep("done");
         setView("home");
@@ -1052,7 +1186,7 @@ export default function Home() {
       const sharedChallenge = pendingSharedChallenge ?? readSharedChallengeFromUrl();
 
       if (sharedChallenge) {
-        openSharedChallenge(sharedChallenge, todayMatches.data, pseudo);
+        await openSharedChallenge(sharedChallenge, todayMatches.data, pseudo);
       } else {
         setOnboardingStep("done");
         setView("home");
@@ -1777,6 +1911,7 @@ export default function Home() {
                 friendPseudo={challengeFriendPseudo}
                 matchLabel={selectedChallenge.label}
                 onCopy={copyChallengeLink}
+                onRefreshResult={() => resolveFriendChallengeResult()}
                 onShare={shareChallengeLink}
                 ownerPseudo={challengeOwnerPseudo}
                 playerPick={challengePick}
@@ -1806,6 +1941,40 @@ export default function Home() {
                   />
                 )}
               </section>
+            )}
+
+            {challengeStep === "result" && challengeResult && (
+              <ChallengeResultCard
+                challenge={challengeResult}
+                onShare={async () => {
+                  const creatorWins =
+                    (challengeResult.creatorPoints ?? 0) >
+                    (challengeResult.friendPoints ?? 0);
+                  const friendWins =
+                    (challengeResult.friendPoints ?? 0) >
+                    (challengeResult.creatorPoints ?? 0);
+                  const text = creatorWins
+                    ? `${challengeResult.creatorPseudo} connaît plus le foot que ${challengeResult.friendPseudo ?? "son ami"} sur Panen&Co.`
+                    : friendWins
+                      ? `${challengeResult.friendPseudo ?? "Ton ami"} connaît plus le foot que ${challengeResult.creatorPseudo} sur Panen&Co.`
+                      : `Égalité parfaite sur Panen&Co entre ${challengeResult.creatorPseudo} et ${challengeResult.friendPseudo ?? "son ami"}.`;
+
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({
+                        text,
+                        title: "Défi Panen&Co",
+                      });
+                      return;
+                    }
+
+                    await navigator.clipboard.writeText(text);
+                    window.alert("Résultat copié, prêt à partager.");
+                  } catch {
+                    await navigator.clipboard.writeText(text);
+                  }
+                }}
+              />
             )}
 
           </section>
@@ -2606,6 +2775,7 @@ function ChallengeInProgressCard({
   challengeLink,
   copied,
   onCopy,
+  onRefreshResult,
   onShare,
   ownerPseudo,
   stake,
@@ -2617,6 +2787,7 @@ function ChallengeInProgressCard({
   challengeLink: string;
   copied: boolean;
   onCopy: () => void;
+  onRefreshResult: () => void;
   onShare: () => void;
   ownerPseudo: string;
   stake: string;
@@ -2643,9 +2814,18 @@ function ChallengeInProgressCard({
         />
       </div>
       {friendPick && (
-        <p className="mt-4 rounded-2xl border border-[#00baff]/40 bg-[#eefaff] p-3 text-sm font-black text-[#00baff]">
-          Défi en cours : les résultats seront disponibles une fois le match terminé.
-        </p>
+        <>
+          <p className="mt-4 rounded-2xl border border-[#00baff]/40 bg-[#eefaff] p-3 text-sm font-black text-[#00baff]">
+            Défi en cours : les résultats seront disponibles une fois le match terminé.
+          </p>
+          <button
+            className="mt-3 h-12 w-full rounded-2xl border border-[#00baff] font-black uppercase text-[#00baff]"
+            onClick={onRefreshResult}
+            type="button"
+          >
+            Actualiser le résultat
+          </button>
+        </>
       )}
       {!friendPick && (
         <>
@@ -2710,6 +2890,74 @@ function ChallengeAcceptCard({
         Accepter le défi
       </button>
     </section>
+  );
+}
+
+function ChallengeResultCard({
+  challenge,
+  onShare,
+}: {
+  challenge: FriendChallenge;
+  onShare: () => void;
+}) {
+  const creatorPoints = challenge.creatorPoints ?? 0;
+  const friendPoints = challenge.friendPoints ?? 0;
+  const friendPseudo = challenge.friendPseudo ?? "Ton ami";
+  const winner =
+    creatorPoints > friendPoints
+      ? challenge.creatorPseudo
+      : friendPoints > creatorPoints
+        ? friendPseudo
+        : null;
+
+  return (
+    <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5">
+      <p className="text-xs font-black uppercase text-[#00baff]">Résultats</p>
+      <h2 className="mt-1 text-xl font-black">{challenge.matchLabel}</h2>
+      <p className="mt-3 rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-sm font-bold text-[#4e596b]">
+        {winner
+          ? `${winner} connaît plus le foot aujourd'hui.`
+          : "Égalité parfaite, personne ne chambre personne."}
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <ScorePill label={challenge.creatorPseudo} points={creatorPoints} />
+        <ScorePill label={friendPseudo} points={friendPoints} />
+      </div>
+      <div className="mt-4 grid gap-3">
+        <PredictionSideCard
+          label={challenge.creatorPseudo}
+          pick={challenge.creatorPick}
+          status={`${creatorPoints} pts`}
+        />
+        {challenge.creatorScoreDetails && (
+          <ScoreDetails details={challenge.creatorScoreDetails} />
+        )}
+        <PredictionSideCard
+          label={friendPseudo}
+          pick={challenge.friendPick ?? null}
+          status={`${friendPoints} pts`}
+        />
+        {challenge.friendScoreDetails && (
+          <ScoreDetails details={challenge.friendScoreDetails} />
+        )}
+      </div>
+      <button
+        className="mt-4 h-12 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black"
+        onClick={onShare}
+        type="button"
+      >
+        Partager
+      </button>
+    </section>
+  );
+}
+
+function ScorePill({ label, points }: { label: string; points: number }) {
+  return (
+    <div className="rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-4">
+      <p className="text-sm font-black text-[#4e596b]">{label}</p>
+      <p className="mt-1 text-2xl font-black text-[#00baff]">{points} pts</p>
+    </div>
   );
 }
 

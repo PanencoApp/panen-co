@@ -872,19 +872,7 @@ export default function Home() {
     event.preventDefault();
     setFriendPick(readPickFromForm(event.currentTarget));
     setChallengeFriendPseudo(userProfile.pseudo);
-    setChallengeStep("result");
-  }
-
-  function resetChallenge() {
-    setChallengeMatch(dailyMatches[0]?.id ?? "");
-    setChallengePick(null);
-    setFriendPick(null);
-    setChallengeStake("Un verre ce week-end");
-    setChallengeOwnerPseudo(userProfile.pseudo);
-    setChallengeFriendPseudo("");
-    setIsSharedChallengeGuest(false);
-    setChallengeCopied(false);
-    setChallengeStep("setup");
+    setChallengeStep("share");
   }
 
   async function loadAdminData() {
@@ -1820,17 +1808,6 @@ export default function Home() {
               </section>
             )}
 
-            {challengeStep === "result" && challengePick && friendPick && (
-              <ChallengeResultCard
-                friendPick={friendPick}
-                friendPseudo={challengeFriendPseudo}
-                matchLabel={selectedChallenge.label}
-                ownerPseudo={challengeOwnerPseudo}
-                onReset={resetChallenge}
-                playerPick={challengePick}
-                stake={challengeStake}
-              />
-            )}
           </section>
         )}
       </div>
@@ -2665,6 +2642,11 @@ function ChallengeInProgressCard({
           status={friendPick ? "Predictions posees" : "En attente du lien"}
         />
       </div>
+      {friendPick && (
+        <p className="mt-4 rounded-2xl border border-[#00baff]/40 bg-[#eefaff] p-3 text-sm font-black text-[#00baff]">
+          Défi en cours : les résultats seront disponibles une fois le match terminé.
+        </p>
+      )}
       {!friendPick && (
         <>
           <div className="mt-4 rounded-2xl border border-[#d9e1ea] bg-[#eef3f8] p-3 text-sm font-bold text-[#4e596b]">
@@ -2726,109 +2708,6 @@ function ChallengeAcceptCard({
         type="button"
       >
         Accepter le défi
-      </button>
-    </section>
-  );
-}
-
-function ChallengeResultCard({
-  matchLabel,
-  stake,
-  playerPick,
-  friendPick,
-  friendPseudo,
-  ownerPseudo,
-  onReset,
-}: {
-  matchLabel: string;
-  stake: string;
-  playerPick: PredictionPick;
-  friendPick: PredictionPick;
-  friendPseudo: string;
-  ownerPseudo: string;
-  onReset: () => void;
-}) {
-  const [resultCopied, setResultCopied] = useState(false);
-  const adminScore = 7;
-  const friendScore = 5;
-  const stakeText = stake || "pour la gloire";
-  const winnerText =
-    friendScore > adminScore
-      ? `${ownerPseudo} te doit ${stakeText}.`
-      : `Tu dois ${stakeText} a ${ownerPseudo}.`;
-  const shareText = `${winnerText} Résultat du défi Panen&Co sur ${matchLabel} : ${ownerPseudo} ${adminScore} pts, ${friendPseudo} ${friendScore} pts.`;
-
-  async function shareResult() {
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          text: shareText,
-          title: "Résultat du défi Panen&Co",
-        });
-      } else {
-        await navigator.clipboard.writeText(shareText);
-      }
-    } catch {
-      await navigator.clipboard.writeText(shareText);
-    }
-
-    setResultCopied(true);
-  }
-
-  return (
-    <section className="space-y-4">
-      <section className="rounded-3xl border border-green-400/60 bg-green-400/10 p-5 text-center shadow-[0_0_34px_rgba(74,222,128,.16)]">
-        <p className="text-xs font-black uppercase text-green-700">
-          Defi termine
-        </p>
-        <h2 className="mt-1 text-xl font-black">{matchLabel}</h2>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-[#00baff] bg-white p-4">
-            <span className="text-xs font-black uppercase text-[#5f6b7f]">
-              {ownerPseudo}
-            </span>
-            <strong className="mt-2 block text-5xl font-black text-[#00baff]">
-              {adminScore}
-            </strong>
-            <small className="font-black text-[#4e596b]">pts</small>
-          </div>
-          <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4">
-            <span className="text-xs font-black uppercase text-[#5f6b7f]">
-              {friendPseudo}
-            </span>
-            <strong className="mt-2 block text-5xl font-black text-[#00baff]">
-              {friendScore}
-            </strong>
-            <small className="font-black text-[#4e596b]">pts</small>
-          </div>
-        </div>
-        <p className="mt-4 rounded-2xl border border-[#d9e1ea] bg-white p-3 text-sm font-bold text-[#4e596b]">
-          {winnerText}
-        </p>
-        <button
-          className="mt-3 h-12 w-full rounded-2xl border border-[#00baff] bg-white font-black uppercase text-[#00baff]"
-          onClick={shareResult}
-          type="button"
-        >
-          {resultCopied ? "Résultat copié" : "Partager"}
-        </button>
-      </section>
-      <PredictionSideCard
-        label={ownerPseudo}
-        pick={playerPick}
-        status={`${adminScore} pts`}
-      />
-      <PredictionSideCard
-        label={friendPseudo}
-        pick={friendPick}
-        status={`${friendScore} pts`}
-      />
-      <button
-        className="h-12 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black"
-        onClick={onReset}
-        type="button"
-      >
-        Refaire un defi
       </button>
     </section>
   );

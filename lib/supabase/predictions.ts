@@ -60,6 +60,42 @@ function kickoffFromLabel(time: string) {
   return date.toISOString();
 }
 
+function formatPredictionMatchTime(kickoffAt?: string, fallback?: string) {
+  if (!kickoffAt) return fallback ?? "Aujourd'hui";
+
+  const date = new Date(kickoffAt);
+
+  if (Number.isNaN(date.getTime())) return fallback ?? "Aujourd'hui";
+
+  const today = new Intl.DateTimeFormat("fr-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Paris",
+    year: "numeric",
+  }).format(new Date());
+  const matchDay = new Intl.DateTimeFormat("fr-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Paris",
+    year: "numeric",
+  }).format(date);
+  const time = new Intl.DateTimeFormat("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Paris",
+  }).format(date);
+
+  if (today === matchDay) return `Aujourd'hui ${time}`;
+
+  const day = new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "Europe/Paris",
+  }).format(date);
+
+  return `${day} ${time}`;
+}
+
 function getMatchRow(row: PredictionRow) {
   if (Array.isArray(row.matches)) return row.matches[0] ?? null;
   return row.matches;
@@ -81,7 +117,7 @@ function toPredictionRecord(
     id: row.id,
     matchId: matchRow?.external_id ?? row.match_id,
     matchLabel,
-    matchTime: localMatch?.time ?? "Aujourd'hui",
+    matchTime: localMatch?.time ?? formatPredictionMatchTime(matchRow?.kickoff_at),
     matchDate: matchRow?.kickoff_at,
     createdAt: row.created_at,
     pick: {
@@ -257,10 +293,11 @@ export async function finishPredictionDemoInSupabase({
     .from("predictions")
     .update({ status: "done", points: score, score_details: scoreDetails })
     .eq("id", predictionId)
+    .eq("status", "active")
     .select(
       "id, match_id, created_at, result_pick, scorer_pick, exact_score_pick, first_team_pick, last_team_pick, goals_pick, status, points, score_details, matches(id, external_id, home_team, away_team, kickoff_at)",
     )
-    .single();
+    .maybeSingle();
 
   if (result.error) {
     return {

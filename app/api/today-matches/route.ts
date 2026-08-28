@@ -143,6 +143,9 @@ const teamTranslations = new Map<string, string>([
   ["usa", "États-Unis"],
 ]);
 
+const unreliableMatchPattern =
+  /\b(u\d{2}|u-\d{2}|under\s*\d{2}|youth|reserve|reserves|women|feminine|feminino|amateur|academy|sub-\d{2})\b/i;
+
 function translateTeam(name?: string) {
   if (!name) return "Équipe";
 
@@ -191,6 +194,32 @@ function fixtureAttractiveness(fixture: ApiFootballFixture) {
   if (/france/i.test(pair) && /spain|espagne/i.test(pair)) return 0;
 
   return teamScore(home) + teamScore(away);
+}
+
+function hasReliableResultCoverage(fixture: ApiFootballFixture) {
+  const fixtureId = fixture.fixture?.id;
+  const home = fixture.teams?.home?.name ?? "";
+  const away = fixture.teams?.away?.name ?? "";
+  const league = fixture.league?.name ?? "";
+  const label = `${home} ${away} ${league}`;
+
+  return Boolean(
+    fixtureId &&
+      home &&
+      away &&
+      !unreliableMatchPattern.test(label),
+  );
+}
+
+function isKnownPriorityFixture(fixture: ApiFootballFixture) {
+  const leagueId = fixture.league?.id ?? 0;
+  const leagueName = fixture.league?.name ?? "";
+
+  return (
+    leaguePriority.has(leagueId) ||
+    leagueNamePriority.some(([pattern]) => pattern.test(leagueName)) ||
+    fixtureAttractiveness(fixture) < 50
+  );
 }
 
 function scoreFixture(fixture: ApiFootballFixture) {
@@ -281,13 +310,12 @@ export async function GET() {
       response?: ApiFootballFixture[];
     };
     const fixtures = payload.response ?? [];
-    const playableFixtures = fixtures
-      .filter((fixture) => {
-        const home = fixture.teams?.home?.name;
-        const away = fixture.teams?.away?.name;
-
-        return Boolean(home && away);
-      })
+    const reliableFixtures = fixtures.filter(hasReliableResultCoverage);
+    const priorityFixtures = reliableFixtures.filter(isKnownPriorityFixture);
+    const secondaryFixtures = reliableFixtures.filter(
+      (fixture) => !isKnownPriorityFixture(fixture),
+    );
+    const playableFixtures = [...priorityFixtures, ...secondaryFixtures]
       .sort((a, b) => scoreFixture(a) - scoreFixture(b))
       .slice(0, 5);
     const playable = playableFixtures.map(toMatch);

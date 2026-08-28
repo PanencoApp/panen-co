@@ -252,6 +252,74 @@ async function sendInternalEmail(payload: {
   }
 }
 
+function shouldCheckPredictionResult(prediction: PredictionRecord) {
+  if (
+    prediction.status !== "active" ||
+    !prediction.matchId.startsWith("api-football-") ||
+    !prediction.matchDate
+  ) {
+    return false;
+  }
+
+  const kickoff = new Date(prediction.matchDate).getTime();
+
+  if (Number.isNaN(kickoff)) return false;
+
+  return Date.now() >= kickoff + 105 * 60 * 1000;
+}
+
+async function settlePredictionsOnOpen({
+  matchOptions,
+  predictions,
+  pseudo,
+  userId,
+}: {
+  matchOptions: MatchOption[];
+  predictions: PredictionRecord[];
+  pseudo: string;
+  userId: string;
+}) {
+  const nextPredictions = [...predictions];
+  const settledIds: string[] = [];
+
+  for (const prediction of predictions.filter(shouldCheckPredictionResult)) {
+    const fixtureId = prediction.matchId.replace("api-football-", "");
+    const response = await fetch(`/api/match-result?fixtureId=${fixtureId}`);
+    const payload = (await response.json()) as
+      | { status: "finished"; result: MatchResult }
+      | { status: "not_finished"; apiStatus?: string }
+      | { status: "error"; message?: string };
+
+    if (!response.ok || payload.status !== "finished") continue;
+
+    const scoring = calculatePredictionScore(prediction.pick, payload.result);
+    const saved = await finishPredictionDemoInSupabase({
+      predictionId: prediction.id,
+      score: scoring.total,
+      scoreDetails: scoring.details,
+      matchOptions,
+    });
+
+    if (!saved.data || saved.error) continue;
+
+    const index = nextPredictions.findIndex((item) => item.id === prediction.id);
+
+    if (index >= 0) nextPredictions[index] = saved.data;
+
+    settledIds.push(prediction.id);
+    await addWeeklyPoints({
+      userId,
+      pseudo,
+      points: scoring.total,
+    });
+  }
+
+  return {
+    predictions: nextPredictions,
+    settledIds,
+  };
+}
+
 export default function Home() {
   const [isOnboardingPreview] = useState(
     () =>
@@ -538,7 +606,14 @@ export default function Home() {
           );
         }
         const savedPredictions = await getMyPredictions(user.id, todayMatches.data);
-        if (isMounted) setPredictions(savedPredictions.data);
+        const settledOnOpen = await settlePredictionsOnOpen({
+          matchOptions: todayMatches.data,
+          predictions: savedPredictions.data,
+          pseudo,
+          userId: user.id,
+        });
+        const restoredPredictions = settledOnOpen.predictions;
+        if (isMounted) setPredictions(restoredPredictions);
         const weeklyPlayers = await getWeeklyLeaderboard(user.id);
         if (isMounted) setLeaderboard(weeklyPlayers);
         const currentPoints = await getMyWeeklyPoints(user.id);
@@ -550,11 +625,11 @@ export default function Home() {
         if (isMounted) setWithdrawalRequests(withdrawals);
         const seenIds = readSeenResultIds(user.id);
         const watchedIds = readWatchedResultIds(user.id);
-        const activeIds = savedPredictions.data
+        const activeIds = restoredPredictions
           .filter((prediction) => prediction.status === "active")
           .map((prediction) => prediction.id);
         const nextWatchedIds = Array.from(new Set([...watchedIds, ...activeIds]));
-        const resultIdsToShow = savedPredictions.data
+        const resultIdsToShow = restoredPredictions
           .filter(
             (prediction) =>
               prediction.status === "done" &&

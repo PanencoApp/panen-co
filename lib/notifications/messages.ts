@@ -3,7 +3,8 @@ export type AppNotificationKind =
   | "daily-matches-reminder"
   | "fifth-day-tokens"
   | "friend-challenge-finished"
-  | "prediction-results-ready";
+  | "prediction-results-ready"
+  | "signup-welcome";
 
 type FriendChallengeFinishedParams = {
   loserPseudo: string;
@@ -36,6 +37,10 @@ export const notificationMessages = {
   predictionResultsReady: {
     body: "Check si tu as grimpé au classement de la semaine.",
     title: "Tes résultats t’attendent",
+  },
+  signupWelcome: {
+    body: "Un mail vous a été envoyé pour confirmer votre compte et profiter pleinement de Panen&Co.",
+    title: "Merci pour votre inscription",
   },
 };
 

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { friendChallengeFinishedMessage } from "@/lib/notifications/messages";
+import { sendPushToUsers } from "@/lib/onesignal/server";
 import { calculatePredictionScore, type MatchResult } from "@/lib/scoring";
 import {
   isServerSupabaseConfigured,
@@ -244,6 +246,38 @@ export async function POST(request: NextRequest) {
       { error: updated.error?.message ?? "Résultat non sauvegardé." },
       { status: 500 },
     );
+  }
+
+  const userIds = [challenge.creator_id, challenge.friend_id].filter(
+    (id): id is string => Boolean(id),
+  );
+
+  if (userIds.length > 0) {
+    const isCreatorWinner = creatorScoring.total > friendScoring.total;
+    const isFriendWinner = friendScoring.total > creatorScoring.total;
+    const message =
+      isCreatorWinner || isFriendWinner
+        ? friendChallengeFinishedMessage({
+            loserPseudo: isCreatorWinner
+              ? (challenge.friend_pseudo ?? "Ton ami")
+              : challenge.creator_pseudo,
+            stake: challenge.stake,
+            winnerPseudo: isCreatorWinner
+              ? challenge.creator_pseudo
+              : (challenge.friend_pseudo ?? "Ton ami"),
+          })
+        : {
+            body: "Égalité parfaite sur le défi Panen&Co.",
+            title: "Le défi est terminé",
+          };
+
+    await sendPushToUsers({
+      body: message.body,
+      idempotencyKey: `friend-challenge-finished-${challenge.id}`,
+      title: message.title,
+      url: `/?defi=${challenge.id}`,
+      userIds,
+    }).catch(() => null);
   }
 
   return NextResponse.json({

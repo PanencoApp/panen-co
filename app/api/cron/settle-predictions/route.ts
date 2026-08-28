@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { notificationMessages } from "@/lib/notifications/messages";
+import { sendPushToEveryone, sendPushToUsers } from "@/lib/onesignal/server";
 import { calculatePredictionScore, type MatchResult } from "@/lib/scoring";
 import { currentWeekStart } from "@/lib/supabase/leaderboard";
 import {
@@ -69,6 +71,60 @@ type ApiFootballEvent = {
 };
 
 const finishedStatuses = new Set(["FT", "AET", "PEN"]);
+
+function parisParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("fr-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Paris",
+    year: "numeric",
+  }).formatToParts(date);
+
+  return {
+    day: Number(parts.find((part) => part.type === "day")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+    year: Number(parts.find((part) => part.type === "year")?.value),
+  };
+}
+
+function parisOffsetMinutes(date: Date) {
+  const timeZoneName =
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Europe/Paris",
+      timeZoneName: "shortOffset",
+    })
+      .formatToParts(date)
+      .find((part) => part.type === "timeZoneName")?.value ?? "GMT+1";
+  const match = timeZoneName.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+
+  if (!match) return 60;
+
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number(match[2] ?? 0);
+  const minutes = Number(match[3] ?? 0);
+
+  return sign * (hours * 60 + minutes);
+}
+
+function nextParisHour(hour: number) {
+  const now = new Date();
+  const parts = parisParts(now);
+  const firstGuess = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, hour));
+  const offset = parisOffsetMinutes(firstGuess);
+  let target = new Date(firstGuess.getTime() - offset * 60 * 1000);
+
+  if (target.getTime() <= now.getTime()) {
+    target = new Date(target.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  return target;
+}
+
+function parisDayKey(date = new Date()) {
+  const parts = parisParts(date);
+
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
 
 function normalize(value?: string) {
   return (value ?? "")
@@ -244,6 +300,7 @@ export async function GET(request: NextRequest) {
 
   const rows = (active.data ?? []) as PredictionRow[];
   const resultCache = new Map<string, MatchResult | null>();
+  const resultNotificationUserIds = new Set<string>();
   let settled = 0;
 
   for (const row of rows) {
@@ -277,6 +334,7 @@ export async function GET(request: NextRequest) {
     if (!updated.data || updated.error) continue;
 
     settled += 1;
+    resultNotificationUserIds.add(row.user_id);
     await addWeeklyPoints({
       points: scoring.total,
       pseudo: getPseudo(row),
@@ -300,6 +358,52 @@ export async function GET(request: NextRequest) {
     settled > 0
       ? await syncWeeklyRewards().catch(() => ({ creditedUsers: 0 }))
       : { creditedUsers: 0 };
+  const dayKey = parisDayKey();
+  const nextMidnight = nextParisHour(0);
+  const nextMorning = nextParisHour(9);
+  const nextMidnightKey = parisDayKey(nextMidnight);
+  const nextMorningKey = parisDayKey(nextMorning);
+  const dailyMatches = notificationMessages.dailyMatches;
+  const dailyReminder = notificationMessages.dailyMatchesReminder;
+
+  await sendPushToEveryone({
+    body: dailyMatches.body,
+    idempotencyKey: `daily-matches-${nextMidnightKey}`,
+    sendAfter: nextMidnight.toISOString(),
+    title: dailyMatches.title,
+    url: "/",
+  }).catch(() => null);
+
+  await sendPushToEveryone({
+    body: dailyReminder.body,
+    idempotencyKey: `daily-matches-reminder-${nextMorningKey}`,
+    sendAfter: nextMorning.toISOString(),
+    title: dailyReminder.title,
+    url: "/",
+  }).catch(() => null);
+
+  if (parisParts().day === 5) {
+    const fifthDayTokens = notificationMessages.fifthDayTokens;
+
+    await sendPushToEveryone({
+      body: fifthDayTokens.body,
+      idempotencyKey: `fifth-day-tokens-${dayKey}`,
+      title: fifthDayTokens.title,
+      url: "/",
+    }).catch(() => null);
+  }
+
+  if (resultNotificationUserIds.size > 0) {
+    const resultsReady = notificationMessages.predictionResultsReady;
+
+    await sendPushToUsers({
+      body: resultsReady.body,
+      idempotencyKey: `prediction-results-ready-${dayKey}-${settled}`,
+      title: resultsReady.title,
+      url: "/",
+      userIds: Array.from(resultNotificationUserIds),
+    }).catch(() => null);
+  }
 
   return NextResponse.json({
     checked: rows.length,

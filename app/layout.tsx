@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,6 +27,10 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+const oneSignalAppId =
+  process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID ??
+  "9c37759d-d557-4216-8a83-9b13eda4ed84";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -33,7 +38,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Script
+          src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+          strategy="afterInteractive"
+        />
+        <Script id="onesignal-init" strategy="afterInteractive">
+          {`
+            window.OneSignalDeferred = window.OneSignalDeferred || [];
+            window.OneSignalDeferred.push(async function(OneSignal) {
+              await OneSignal.init({
+                appId: "${oneSignalAppId}",
+                allowLocalhostAsSecureOrigin: true,
+              });
+            });
+          `}
+        </Script>
+      </body>
     </html>
   );
 }

@@ -165,6 +165,38 @@ type SharedChallenge = {
   stake: string;
 };
 
+type OneSignalSdk = {
+  login?: (externalId: string) => Promise<void> | void;
+  logout?: () => Promise<void> | void;
+  Notifications?: {
+    optIn?: () => Promise<void> | void;
+    optOut?: () => Promise<void> | void;
+    requestPermission?: () => Promise<boolean | void> | boolean | void;
+  };
+  User?: {
+    addTags?: (tags: Record<string, string>) => Promise<void> | void;
+  };
+};
+
+declare global {
+  interface Window {
+    OneSignalDeferred?: Array<(oneSignal: OneSignalSdk) => void | Promise<void>>;
+  }
+}
+
+function withOneSignal(callback: (oneSignal: OneSignalSdk) => void | Promise<void>) {
+  if (typeof window === "undefined") return;
+
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async (oneSignal) => {
+    try {
+      await callback(oneSignal);
+    } catch {
+      // Les notifications restent optionnelles : l'app continue si le navigateur refuse.
+    }
+  });
+}
+
 function encodeSharedChallenge(challenge: SharedChallenge) {
   if (typeof window === "undefined") return "";
 
@@ -442,21 +474,24 @@ export default function Home() {
   const rankDelta = previousWeeklyRank - updatedWeeklyRank;
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-    if (process.env.NODE_ENV !== "production") return;
-
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Panen&Co reste utilisable si le navigateur refuse le service worker.
-    });
-  }, []);
-
-  useEffect(() => {
     return listenForPasswordRecovery(() => {
       setShowSplash(false);
       setAuthBusy(false);
       setOnboardingStep("reset-password");
     });
   }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    withOneSignal(async (oneSignal) => {
+      await oneSignal.login?.(currentUserId);
+      await oneSignal.User?.addTags?.({
+        email: userProfile.email,
+        pseudo: userProfile.pseudo,
+      });
+    });
+  }, [currentUserId, userProfile.email, userProfile.pseudo]);
 
   async function loadPlayers(match: MatchOption | null) {
     if (!match?.homeTeamId || !match.awayTeamId) return [];
@@ -3485,6 +3520,21 @@ function ProfileDrawer({
     }
   }
 
+  async function toggleNotifications() {
+    const nextValue = !notificationsEnabled;
+
+    setNotificationsEnabled(nextValue);
+
+    withOneSignal(async (oneSignal) => {
+      if (nextValue) {
+        await oneSignal.Notifications?.requestPermission?.();
+        await oneSignal.Notifications?.optIn?.();
+      } else {
+        await oneSignal.Notifications?.optOut?.();
+      }
+    });
+  }
+
   return (
     <aside className="fixed inset-0 z-50 bg-black/25 backdrop-blur-lg">
       <section className="ml-auto flex h-full w-[92%] max-w-[430px] flex-col border-l border-[#d9e1ea] bg-white p-5 shadow-[-18px_0_45px_rgba(15,23,42,.12)]">
@@ -3516,7 +3566,7 @@ function ProfileDrawer({
             aria-label="Notifications"
             aria-pressed={notificationsEnabled}
             className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3"
-            onClick={() => setNotificationsEnabled((value) => !value)}
+            onClick={toggleNotifications}
             type="button"
           >
             <span className="text-xs font-black uppercase tracking-[0.18em] text-[#4e596b]">

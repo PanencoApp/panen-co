@@ -228,6 +228,30 @@ function readableAuthError(error: unknown) {
   return cleanMessage;
 }
 
+async function sendInternalEmail(payload: {
+  email: string;
+  message?: string;
+  pseudo: string;
+  subject?: string;
+  type: "new-signup" | "support";
+}) {
+  const response = await fetch("/api/emails/send", {
+    body: JSON.stringify(payload),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const result = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    throw new Error(result?.error ?? "Email non envoyé.");
+  }
+}
+
 export default function Home() {
   const [isOnboardingPreview] = useState(
     () =>
@@ -1107,6 +1131,14 @@ export default function Home() {
         window.alert(readableAuthError(result.error));
         return;
       }
+
+      sendInternalEmail({
+        email,
+        pseudo,
+        type: "new-signup",
+      }).catch(() => {
+        // L'inscription reste prioritaire si la notification interne echoue.
+      });
 
       setUserProfile({ pseudo, email, isAdmin: false, password });
       setCurrentUserId(result.data.session ? (result.data.user?.id ?? null) : null);
@@ -3301,6 +3333,7 @@ function ProfileDrawer({
   >("history");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [supportBusy, setSupportBusy] = useState(false);
   const historyItems = predictions.map((prediction) => ({
     ...prediction,
     date: prediction.createdAt
@@ -3320,6 +3353,40 @@ function ProfileDrawer({
     { id: "help", label: "Centre aide" },
     ...(isAdmin ? [{ id: "admin", label: "Admin" } as const] : []),
   ] as const;
+
+  async function submitSupportRequest(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const subject = String(form.get("subject") || "").trim();
+    const message = String(form.get("message") || "").trim();
+
+    if (!subject || !message) {
+      window.alert("Ajoute un sujet et un message pour envoyer ta demande.");
+      return;
+    }
+
+    setSupportBusy(true);
+
+    try {
+      await sendInternalEmail({
+        email: userProfile.email,
+        message,
+        pseudo: userProfile.pseudo,
+        subject,
+        type: "support",
+      });
+      event.currentTarget.reset();
+      window.alert("Demande envoyée. Réponse assurée sous 24h.");
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Impossible d'envoyer la demande pour le moment.",
+      );
+    } finally {
+      setSupportBusy(false);
+    }
+  }
 
   return (
     <aside className="fixed inset-0 z-50 bg-black/25 backdrop-blur-lg">
@@ -3534,16 +3601,22 @@ function ProfileDrawer({
 
           {section === "help" && (
             <ProfilePanel title="Centre aide">
-              <input className="input" placeholder="Sujet" />
-              <textarea
-                className="min-h-28 rounded-2xl border border-[#d9e1ea] bg-white p-3 font-bold outline-none focus:border-[#00baff] focus:ring-4 focus:ring-[#00baff]/15"
-                placeholder="À ton écoute"
-              />
-              <button className="h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black">
-                Envoyer ma demande
-              </button>
+              <form className="grid gap-3" onSubmit={submitSupportRequest}>
+                <input className="input" name="subject" placeholder="Sujet" />
+                <textarea
+                  className="min-h-28 rounded-2xl border border-[#d9e1ea] bg-white p-3 font-bold outline-none focus:border-[#00baff] focus:ring-4 focus:ring-[#00baff]/15"
+                  name="message"
+                  placeholder="À ton écoute"
+                />
+                <button
+                  className="h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black disabled:opacity-60"
+                  disabled={supportBusy}
+                >
+                  {supportBusy ? "Envoi..." : "Envoyer ma demande"}
+                </button>
+              </form>
               <p className="text-sm font-bold text-[#4e596b]">
-                Reponse assuree sous 24h.
+                Réponse assurée sous 24h.
               </p>
             </ProfilePanel>
           )}

@@ -204,6 +204,30 @@ function buildSharedChallengeLink(challenge: SharedChallenge) {
   return url.toString();
 }
 
+function readableAuthError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  const cleanMessage = message.trim();
+
+  if (!cleanMessage || cleanMessage === "{}") {
+    return "Inscription impossible pour le moment. Vérifie l'adresse email, puis la configuration SMTP Supabase.";
+  }
+
+  if (cleanMessage.toLowerCase().includes("already")) {
+    return "Ce pseudo ou cet email est déjà utilisé.";
+  }
+
+  if (cleanMessage.toLowerCase().includes("smtp")) {
+    return "L'envoi du mail de confirmation est bloqué. Vérifie la configuration SMTP Supabase.";
+  }
+
+  return cleanMessage;
+}
+
 export default function Home() {
   const [isOnboardingPreview] = useState(
     () =>
@@ -1068,23 +1092,19 @@ export default function Home() {
       const availability = await checkProfileAvailability({ pseudo, email });
 
       if (!availability.data.pseudoAvailable) {
-        window.alert("Ce pseudo est deja utilise. Choisis-en un autre.");
+        window.alert("Ce pseudo est déjà utilisé. Choisis-en un autre.");
         return;
       }
 
       if (!availability.data.emailAvailable) {
-        window.alert("Cette adresse email est deja utilisee. Connecte-toi plutot.");
+        window.alert("Cette adresse email est déjà utilisée. Connecte-toi plutôt.");
         return;
       }
 
       const result = await signUpWithEmail({ pseudo, email, password });
 
       if (result.error) {
-        window.alert(
-          result.error.message.toLowerCase().includes("already")
-            ? "Ce pseudo ou cet email est deja utilise."
-            : result.error.message,
-        );
+        window.alert(readableAuthError(result.error));
         return;
       }
 

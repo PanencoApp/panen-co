@@ -3356,7 +3356,8 @@ function ProfileDrawer({
 
   async function submitSupportRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const subject = String(form.get("subject") || "").trim();
     const message = String(form.get("message") || "").trim();
 
@@ -3375,7 +3376,7 @@ function ProfileDrawer({
         subject,
         type: "support",
       });
-      event.currentTarget.reset();
+      formElement.reset();
       window.alert("Demande envoyée. Réponse assurée sous 24h.");
     } catch (error) {
       window.alert(

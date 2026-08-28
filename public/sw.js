@@ -42,3 +42,50 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(request).then((cached) => cached || caches.match("/"))),
   );
 });
+
+self.addEventListener("push", (event) => {
+  const fallback = {
+    body: "Une nouveauté t’attend sur Panen&Co.",
+    title: "Panen&Co",
+    url: "/",
+  };
+  let data = fallback;
+
+  try {
+    data = event.data ? event.data.json() : fallback;
+  } catch {
+    data = fallback;
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || fallback.title, {
+      badge: "/panen-co-small-logo.png",
+      body: data.body || fallback.body,
+      data: {
+        url: data.url || fallback.url,
+      },
+      icon: "/panen-co-small-logo.png",
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if ("focus" in client) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
+        }
+
+        return self.clients.openWindow(targetUrl);
+      }),
+  );
+});

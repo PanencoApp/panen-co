@@ -176,6 +176,24 @@ function encodeSharedChallenge(challenge: SharedChallenge) {
 function decodeSharedChallenge(value: string | null): SharedChallenge | null {
   if (!value || typeof window === "undefined") return null;
 
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    return {
+      challengeId: value,
+      from: "",
+      matchId: "",
+      matchLabel: "",
+      pick: {
+        exactScore: "",
+        firstTeam: "",
+        goals: "",
+        lastTeam: "",
+        result: "",
+        scorer: "",
+      },
+      stake: "",
+    };
+  }
+
   try {
     const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
     const padded = normalized.padEnd(
@@ -199,7 +217,10 @@ function buildSharedChallengeLink(challenge: SharedChallenge) {
   if (typeof window === "undefined") return "";
 
   const url = new URL(window.location.origin);
-  url.searchParams.set("defi", encodeSharedChallenge(challenge));
+  url.searchParams.set(
+    "defi",
+    challenge.challengeId ?? encodeSharedChallenge(challenge),
+  );
 
   return url.toString();
 }

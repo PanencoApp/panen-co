@@ -419,6 +419,9 @@ export default function Home() {
   const [showTokens, setShowTokens] = useState(false);
   const [showWithdrawal, setShowWithdrawal] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [profileInitialSection, setProfileInitialSection] = useState<
+    "history" | "subscription" | "security" | "about" | "help" | "admin"
+  >("history");
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
@@ -1568,7 +1571,10 @@ export default function Home() {
               </div>
               <button
                 className="grid h-12 w-12 place-items-center rounded-full bg-white shadow-[0_12px_30px_rgba(15,23,42,.10)]"
-                onClick={() => setShowProfile(true)}
+                onClick={() => {
+                  setProfileInitialSection("history");
+                  setShowProfile(true);
+                }}
                 type="button"
                 aria-label="Menu"
               >
@@ -2222,11 +2228,17 @@ export default function Home() {
             }
           }}
           onClose={() => setShowTokens(false)}
+          onOpenSubscription={() => {
+            setShowTokens(false);
+            setProfileInitialSection("subscription");
+            setShowProfile(true);
+          }}
           onSubscribe={startSubscriptionCheckout}
         />
       )}
       {showProfile && (
         <ProfileDrawer
+          initialSection={profileInitialSection}
           isSubscribed={isActiveSubscription(subscription)}
           onManageSubscription={manageSubscription}
           onSubscribe={startSubscriptionCheckout}
@@ -3320,11 +3332,13 @@ function TokenModal({
   isSubscribed,
   onClose,
   onAd,
+  onOpenSubscription,
   onSubscribe,
 }: {
   isSubscribed: boolean;
   onClose: () => void;
   onAd: () => void | Promise<void>;
+  onOpenSubscription: () => void;
   onSubscribe: (plan: SubscriptionPlan) => void | Promise<void>;
 }) {
   const [adStep, setAdStep] = useState<"idle" | "playing" | "granted">("idle");
@@ -3368,6 +3382,13 @@ function TokenModal({
                 Tu bénéficies déjà de 5 jetons par jour. Tu pourras changer
                 d’offre à la fin de l’abonnement en cours.
               </span>
+              <button
+                className="mt-4 text-sm font-black text-[#00a7e6]"
+                onClick={onOpenSubscription}
+                type="button"
+              >
+                Voir mon abonnement actuel
+              </button>
             </div>
           ) : (
             <div className="rounded-2xl border border-[#00baff]/50 bg-gradient-to-br from-[#e9faff] to-white p-4">
@@ -3582,6 +3603,7 @@ function WithdrawalModal({
 }
 
 function ProfileDrawer({
+  initialSection,
   isSubscribed,
   onManageSubscription,
   onSubscribe,
@@ -3593,6 +3615,7 @@ function ProfileDrawer({
   userProfile,
   withdrawalRequests,
 }: {
+  initialSection: "history" | "subscription" | "security" | "about" | "help" | "admin";
   isSubscribed: boolean;
   onManageSubscription: () => void | Promise<void>;
   onSubscribe: (plan: SubscriptionPlan) => void | Promise<void>;
@@ -3607,7 +3630,7 @@ function ProfileDrawer({
   const isAdmin = userProfile.isAdmin === true;
   const [section, setSection] = useState<
     "history" | "subscription" | "security" | "about" | "help" | "admin"
-  >("history");
+  >(initialSection);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [now] = useState(() => Date.now());
   const commitmentEndDate = subscription?.commitmentUntil
@@ -3618,6 +3641,8 @@ function ProfileDrawer({
     subscription?.plan === "annual" &&
     commitmentEndDate !== null &&
     commitmentEndDate.getTime() > now;
+  const isMonthlyPlanActive = isSubscribed && subscription?.plan === "monthly";
+  const isAnnualPlanActive = isSubscribed && subscription?.plan === "annual";
   const [supportBusy, setSupportBusy] = useState(false);
   const historyItems = predictions.map((prediction) => ({
     ...prediction,
@@ -3776,13 +3801,26 @@ function ProfileDrawer({
                 </p>
                 <div className="mt-4 grid gap-2">
                   <button
-                    className="rounded-2xl border border-[#d9e1ea] bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,.06)]"
+                    className={
+                      (isMonthlyPlanActive
+                        ? "border-[#00baff] bg-[#00baff]/10 shadow-[0_12px_26px_rgba(0,186,255,.12)]"
+                        : "border-[#d9e1ea] bg-white shadow-[0_10px_24px_rgba(15,23,42,.06)]") +
+                      " rounded-2xl border p-3 text-left disabled:cursor-default"
+                    }
+                    disabled={isSubscribed}
                     onClick={() => onSubscribe("monthly")}
                     type="button"
                   >
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-[#697386]">
-                      Flexible
-                    </span>
+                    {(!isSubscribed || isMonthlyPlanActive) && (
+                      <span
+                        className={
+                          (isMonthlyPlanActive ? "text-[#00a7e6]" : "text-[#697386]") +
+                          " text-xs font-black uppercase tracking-[0.16em]"
+                        }
+                      >
+                        {isMonthlyPlanActive ? "Offre actuelle" : "Flexible"}
+                      </span>
+                    )}
                     <strong className="mt-1 block text-xl text-[#0b0f19]">
                       14,99 &euro;/mois
                     </strong>
@@ -3791,13 +3829,21 @@ function ProfileDrawer({
                     </p>
                   </button>
                   <button
-                    className="rounded-2xl border border-[#00baff] bg-[#00baff]/10 p-3 text-left shadow-[0_12px_26px_rgba(0,186,255,.12)]"
+                    className={
+                      (isAnnualPlanActive || !isSubscribed
+                        ? "border-[#00baff] bg-[#00baff]/10 shadow-[0_12px_26px_rgba(0,186,255,.12)]"
+                        : "border-[#d9e1ea] bg-white shadow-[0_10px_24px_rgba(15,23,42,.06)]") +
+                      " rounded-2xl border p-3 text-left disabled:cursor-default"
+                    }
+                    disabled={isSubscribed}
                     onClick={() => onSubscribe("annual")}
                     type="button"
                   >
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-[#00a7e6]">
-                      Meilleure offre
-                    </span>
+                    {(!isSubscribed || isAnnualPlanActive) && (
+                      <span className="text-xs font-black uppercase tracking-[0.16em] text-[#00a7e6]">
+                        {isAnnualPlanActive ? "Offre actuelle" : "Meilleure offre"}
+                      </span>
+                    )}
                     <strong className="mt-1 block text-xl text-[#0b0f19]">
                       8,99 &euro;/mois
                     </strong>

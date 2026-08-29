@@ -3313,7 +3313,7 @@ function TokenModal({
           >
             <strong className="block text-[#00baff]">Abonnement</strong>
             <span className="text-sm text-[#4e596b]">
-              9,99 &euro;/mois · 5 jetons par jour
+              14,99 &euro;/mois sans engagement, ou 8,99 &euro;/mois pendant 1 an
             </span>
           </button>
           <button
@@ -3665,12 +3665,35 @@ function ProfileDrawer({
                   {isSubscribed ? "Abonnement en cours" : "Pas d'abonnement"}
                 </strong>
                 <p className="mt-2 text-sm font-bold leading-6 text-[#4e596b]">
-                  Sans engagement et r&eacute;siliable &agrave; tout moment, notre
-                  abonnement &agrave; 9,99 &euro;/mois vous d&eacute;livre
-                  directement 5 jetons quotidiens pour maximiser vos pronostics
-                  et multiplier vos chances d&apos;atteindre le sommet du
-                  classement.
+                  Profitez de 5 jetons par jour pour multiplier vos pronostics
+                  et viser le sommet du classement. Choisissez l&apos;offre
+                  mensuelle sans engagement ou l&apos;offre annuelle engagée avec
+                  72 &euro; d&apos;économie.
                 </p>
+                <div className="mt-4 grid gap-2">
+                  <div className="rounded-2xl border border-[#d9e1ea] bg-white p-3">
+                    <span className="text-xs font-black uppercase tracking-[0.16em] text-[#697386]">
+                      Flexible
+                    </span>
+                    <strong className="mt-1 block text-xl text-[#0b0f19]">
+                      14,99 &euro;/mois
+                    </strong>
+                    <p className="text-xs font-bold text-[#4e596b]">
+                      Sans engagement, résiliable à tout moment.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[#00baff] bg-[#00baff]/10 p-3">
+                    <span className="text-xs font-black uppercase tracking-[0.16em] text-[#00baff]">
+                      Meilleure offre
+                    </span>
+                    <strong className="mt-1 block text-xl text-[#0b0f19]">
+                      8,99 &euro;/mois pendant 1 an
+                    </strong>
+                    <p className="text-xs font-bold text-[#4e596b]">
+                      Engagement 12 mois, économisez 72 &euro;.
+                    </p>
+                  </div>
+                </div>
               </div>
               {isSubscribed ? (
                 <button
@@ -4133,7 +4156,7 @@ function AboutContent() {
       />
       <InfoBlock
         title="Jetons"
-        text="1 jeton gratuit est offert automatiquement chaque jour. Le 5 du mois, tous les utilisateurs reçoivent 5 jetons gratuits. Regardez une video publicitaire de 20 secondes pour debloquer +1 jeton. L'abonnement Premium a 9,99 euro / mois debloque les 5 jetons quotidiens sans publicite."
+        text="1 jeton gratuit est offert automatiquement chaque jour. Le 5 du mois, tous les utilisateurs reçoivent 5 jetons gratuits. Regardez une vidéo publicitaire de 20 secondes pour débloquer +1 jeton. L'abonnement Premium débloque 5 jetons quotidiens sans publicité."
       />
       <InfoBlock
         title="Classement Hebdomadaire"
@@ -4174,7 +4197,7 @@ function AboutContent() {
           />
           <InfoBlock
             title="3. Gains & Abonnements"
-            text="Les dotations sont offertes par Panen&Co et financees par la publicite et les abonnements Premium. Les abonnements a 9,99 euro / mois sont sans engagement, factures mensuellement et resiliables a tout moment. Un solde minimal de 20 euro est requis pour demander un versement, soumis a verification d'identite et de majorite."
+            text="Les dotations sont offertes par Panen&Co et financées par la publicité et les abonnements Premium. L'offre mensuelle à 14,99 euro / mois est sans engagement et résiliable à tout moment. L'offre annuelle à 8,99 euro / mois implique un engagement de 12 mois et permet d'économiser 72 euro sur l'année. Un solde minimal de 20 euro est requis pour demander un versement, soumis à vérification d'identité et de majorité."
           />
           <InfoBlock
             title="4. Anti-Triche et Fair-Play"

@@ -2209,6 +2209,7 @@ export default function Home() {
 
       {showTokens && (
         <TokenModal
+          isSubscribed={hasActiveSubscription}
           onAd={async () => {
             if (currentUserId) {
               const dailyTokens = await addAdToken(currentUserId);
@@ -3316,10 +3317,12 @@ function PredictionDetails({ pick }: { pick: PredictionPick }) {
 }
 
 function TokenModal({
+  isSubscribed,
   onClose,
   onAd,
   onSubscribe,
 }: {
+  isSubscribed: boolean;
   onClose: () => void;
   onAd: () => void | Promise<void>;
   onSubscribe: (plan: SubscriptionPlan) => void | Promise<void>;
@@ -3356,41 +3359,53 @@ function TokenModal({
           </span>
         </div>
         <div className="grid gap-3">
-          <div className="rounded-2xl border border-[#00baff]/50 bg-gradient-to-br from-[#e9faff] to-white p-4">
-            <strong className="block text-lg text-[#00a7e6]">
-              Bénéficiez de 5 jetons par jour
-            </strong>
-            <span className="mt-1 block text-sm font-bold leading-5 text-[#4e596b]">
-              Plus de pronostics, plus d’occasions de grimper au classement.
-            </span>
-            <div className="mt-4 grid gap-2">
-              <button
-                className="rounded-2xl bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,.08)]"
-                onClick={() => onSubscribe("monthly")}
-                type="button"
-              >
-                <span className="block text-xs font-black uppercase tracking-[0.16em] text-[#697386]">
-                  Sans engagement
-                </span>
-                <strong className="mt-1 block text-xl text-[#0b0f19]">
-                  14,99 &euro;/mois
-                </strong>
-              </button>
-              <button
-                className="rounded-2xl bg-[#00baff] p-3 text-left text-black shadow-[0_12px_26px_rgba(0,186,255,.28)]"
-                onClick={() => onSubscribe("annual")}
-                type="button"
-              >
-                <span className="block text-xs font-black uppercase tracking-[0.16em]">
-                  Engagement 1 an
-                </span>
-                <strong className="mt-1 block text-xl">
-                  8,99 &euro;/mois
-                </strong>
-                <span className="text-xs font-black">72 &euro; d’économie</span>
-              </button>
+          {isSubscribed ? (
+            <div className="rounded-2xl border border-[#00baff]/50 bg-gradient-to-br from-[#e9faff] to-white p-4">
+              <strong className="block text-lg text-[#00a7e6]">
+                Abonnement en cours
+              </strong>
+              <span className="mt-1 block text-sm font-bold leading-5 text-[#4e596b]">
+                Tu bénéficies déjà de 5 jetons par jour. Tu pourras changer
+                d’offre à la fin de l’abonnement en cours.
+              </span>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-2xl border border-[#00baff]/50 bg-gradient-to-br from-[#e9faff] to-white p-4">
+              <strong className="block text-lg text-[#00a7e6]">
+                Bénéficiez de 5 jetons par jour
+              </strong>
+              <span className="mt-1 block text-sm font-bold leading-5 text-[#4e596b]">
+                Plus de pronostics, plus d’occasions de grimper au classement.
+              </span>
+              <div className="mt-4 grid gap-2">
+                <button
+                  className="rounded-2xl bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,.08)]"
+                  onClick={() => onSubscribe("monthly")}
+                  type="button"
+                >
+                  <span className="block text-xs font-black uppercase tracking-[0.16em] text-[#697386]">
+                    Sans engagement
+                  </span>
+                  <strong className="mt-1 block text-xl text-[#0b0f19]">
+                    14,99 &euro;/mois
+                  </strong>
+                </button>
+                <button
+                  className="rounded-2xl bg-[#00baff] p-3 text-left text-black shadow-[0_12px_26px_rgba(0,186,255,.28)]"
+                  onClick={() => onSubscribe("annual")}
+                  type="button"
+                >
+                  <span className="block text-xs font-black uppercase tracking-[0.16em]">
+                    Engagement 1 an
+                  </span>
+                  <strong className="mt-1 block text-xl">
+                    8,99 &euro;/mois
+                  </strong>
+                  <span className="text-xs font-black">72 &euro; d’économie</span>
+                </button>
+              </div>
+            </div>
+          )}
           <button
             className="rounded-2xl border border-[#00baff]/40 bg-[#00baff]/10 p-4 text-left"
             disabled={adStep !== "idle"}

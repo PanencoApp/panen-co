@@ -46,6 +46,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Session invalide." }, { status: 401 });
   }
 
+  const existingSubscription = await serverSupabase
+    .from("subscriptions")
+    .select("status,current_period_end")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingSubscription.error) {
+    return NextResponse.json(
+      { error: "Impossible de vérifier l'abonnement en cours." },
+      { status: 500 },
+    );
+  }
+
+  const activePeriodEnd = existingSubscription.data?.current_period_end
+    ? new Date(existingSubscription.data.current_period_end).getTime()
+    : null;
+  const alreadySubscribed =
+    existingSubscription.data &&
+    (existingSubscription.data.status === "active" ||
+      existingSubscription.data.status === "trialing") &&
+    (!activePeriodEnd || activePeriodEnd > Date.now());
+
+  if (alreadySubscribed) {
+    return NextResponse.json(
+      { error: "Tu as déjà un abonnement en cours." },
+      { status: 409 },
+    );
+  }
+
   const body = (await request.json().catch(() => null)) as
     | { plan?: "annual" | "monthly" }
     | null;
@@ -56,21 +85,21 @@ export async function POST(request: NextRequest) {
 
   const checkout = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     body: stripeBody({
-      "allow_promotion_codes": "true",
-      "cancel_url": `${origin}/?stripe=cancel`,
-      "client_reference_id": user.id,
-      "customer_email": user.email ?? "",
+      allow_promotion_codes: "true",
+      cancel_url: `${origin}/?stripe=cancel`,
+      client_reference_id: user.id,
+      customer_email: user.email ?? "",
       "line_items[0][price]": priceId,
       "line_items[0][quantity]": "1",
       "metadata[plan]": plan,
       "metadata[price_id]": priceId,
       "metadata[user_id]": user.id,
-      "mode": "subscription",
+      mode: "subscription",
       "subscription_data[metadata][commitment_months]": commitmentMonths,
       "subscription_data[metadata][price_id]": priceId,
       "subscription_data[metadata][plan]": plan,
       "subscription_data[metadata][user_id]": user.id,
-      "success_url": `${origin}/?stripe=success`,
+      success_url: `${origin}/?stripe=success`,
     }),
     headers: {
       authorization: `Bearer ${stripeSecretKey}`,

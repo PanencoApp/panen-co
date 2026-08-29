@@ -366,48 +366,77 @@ export async function GET(request: NextRequest) {
   const dailyMatches = notificationMessages.dailyMatches;
   const dailyReminder = notificationMessages.dailyMatchesReminder;
 
-  await sendPushToEveryone({
+  const notificationReports = [];
+  const dailyMatchesPush = await sendPushToEveryone({
     body: dailyMatches.body,
     idempotencyKey: `daily-matches-${nextMidnightKey}`,
     sendAfter: nextMidnight.toISOString(),
     title: dailyMatches.title,
     url: "/",
-  }).catch(() => null);
+  });
 
-  await sendPushToEveryone({
+  notificationReports.push({
+    name: "daily-matches",
+    ok: !dailyMatchesPush.error,
+    error: dailyMatchesPush.error?.message,
+    sendAfter: nextMidnight.toISOString(),
+  });
+
+  const dailyReminderPush = await sendPushToEveryone({
     body: dailyReminder.body,
     idempotencyKey: `daily-matches-reminder-${nextMorningKey}`,
     sendAfter: nextMorning.toISOString(),
     title: dailyReminder.title,
     url: "/",
-  }).catch(() => null);
+  });
+
+  notificationReports.push({
+    name: "daily-matches-reminder",
+    ok: !dailyReminderPush.error,
+    error: dailyReminderPush.error?.message,
+    sendAfter: nextMorning.toISOString(),
+  });
 
   if (parisParts().day === 5) {
     const fifthDayTokens = notificationMessages.fifthDayTokens;
 
-    await sendPushToEveryone({
+    const fifthDayTokensPush = await sendPushToEveryone({
       body: fifthDayTokens.body,
       idempotencyKey: `fifth-day-tokens-${dayKey}`,
       title: fifthDayTokens.title,
       url: "/",
-    }).catch(() => null);
+    });
+
+    notificationReports.push({
+      name: "fifth-day-tokens",
+      ok: !fifthDayTokensPush.error,
+      error: fifthDayTokensPush.error?.message,
+    });
   }
 
   if (resultNotificationUserIds.size > 0) {
     const resultsReady = notificationMessages.predictionResultsReady;
 
-    await sendPushToUsers({
+    const resultsReadyPush = await sendPushToUsers({
       body: resultsReady.body,
       idempotencyKey: `prediction-results-ready-${dayKey}-${settled}`,
       title: resultsReady.title,
       url: "/",
       userIds: Array.from(resultNotificationUserIds),
-    }).catch(() => null);
+    });
+
+    notificationReports.push({
+      name: "prediction-results-ready",
+      ok: !resultsReadyPush.error,
+      error: resultsReadyPush.error?.message,
+      users: resultNotificationUserIds.size,
+    });
   }
 
   return NextResponse.json({
     checked: rows.length,
     creditedUsers: rewards.creditedUsers,
+    notifications: notificationReports,
     settled,
   });
 }

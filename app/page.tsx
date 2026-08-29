@@ -2169,11 +2169,13 @@ export default function Home() {
           onAd={async () => {
             if (currentUserId) {
               const dailyTokens = await addAdToken(currentUserId);
+              if (dailyTokens.error) {
+                throw dailyTokens.error;
+              }
               setTokens(dailyTokens.tokens);
             } else {
               setTokens((value) => value + 1);
             }
-            setShowTokens(false);
           }}
           onClose={() => setShowTokens(false)}
         />
@@ -3272,6 +3274,28 @@ function TokenModal({
   onClose: () => void;
   onAd: () => void | Promise<void>;
 }) {
+  const [adStep, setAdStep] = useState<"idle" | "playing" | "granted">("idle");
+
+  async function watchRewardedAd() {
+    if (adStep !== "idle") return;
+
+    setAdStep("playing");
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 5500));
+      await onAd();
+      setAdStep("granted");
+      setTimeout(onClose, 900);
+    } catch (error) {
+      setAdStep("idle");
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Impossible d'ajouter le jeton pour le moment.",
+      );
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-5 backdrop-blur-lg">
       <section className="w-full max-w-[430px] rounded-3xl border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.10)]">
@@ -3294,17 +3318,41 @@ function TokenModal({
           </button>
           <button
             className="rounded-2xl border border-[#00baff]/40 bg-[#00baff]/10 p-4 text-left"
-            onClick={onAd}
+            disabled={adStep !== "idle"}
+            onClick={watchRewardedAd}
             type="button"
           >
-            <strong className="block text-[#00baff]">Regarder une pub</strong>
+            <strong className="block text-[#00baff]">
+              {adStep === "playing"
+                ? "Publicité en cours"
+                : adStep === "granted"
+                  ? "Jeton ajouté"
+                  : "Regarder une pub"}
+            </strong>
             <span className="text-sm text-[#4e596b]">
-              Quelques secondes · +1 jeton valable aujourd&apos;hui
+              {adStep === "playing"
+                ? "Reste jusqu'à la fin pour recevoir ton jeton."
+                : adStep === "granted"
+                  ? "+1 jeton disponible aujourd'hui."
+                  : "Quelques secondes · +1 jeton valable aujourd'hui"}
             </span>
+            {adStep !== "idle" && (
+              <span className="mt-3 block h-2 overflow-hidden rounded-full bg-white">
+                <span
+                  className={
+                    "block h-full rounded-full bg-[#00baff] " +
+                    (adStep === "playing"
+                      ? "animate-[rewardAd_5.5s_linear_forwards]"
+                      : "w-full")
+                  }
+                />
+              </span>
+            )}
           </button>
         </div>
         <button
           className="mt-4 h-12 w-full rounded-2xl border border-[#00baff] font-black uppercase text-[#00baff]"
+          disabled={adStep === "playing"}
           onClick={onClose}
           type="button"
         >

@@ -20,6 +20,8 @@ type ConsumeResult = TokenResult & {
   ok: boolean;
 };
 
+const MAX_DAILY_TOKENS = 5;
+
 function parisDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("fr-CA", {
     day: "2-digit",
@@ -137,6 +139,19 @@ export async function addAdToken(userId: string): Promise<TokenResult> {
 
   if (current.error || !current.row) {
     return current;
+  }
+
+  const issuedTokens =
+    current.row.free_tokens +
+    current.row.ad_tokens +
+    current.row.subscription_tokens;
+
+  if (issuedTokens >= MAX_DAILY_TOKENS) {
+    return {
+      tokens: current.tokens,
+      row: current.row,
+      error: new Error("Tu as déjà atteint la limite de 5 jetons aujourd'hui."),
+    };
   }
 
   const updated = await supabase

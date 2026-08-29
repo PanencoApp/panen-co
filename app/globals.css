@@ -96,3 +96,13 @@ select.input option {
     transform: translateY(0) scale(1);
   }
 }
+
+@keyframes rewardAd {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 100%;
+  }
+}

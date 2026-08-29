@@ -3425,8 +3425,8 @@ function WithdrawalModal({
   }) => void | Promise<void>;
   userProfile: UserProfile;
 }) {
-  const [amount, setAmount] = useState(Math.min(balance, Math.max(20, balance)));
-  const canWithdraw = balance >= 20;
+  const [amount, setAmount] = useState(Math.min(balance, Math.max(1, balance)));
+  const canWithdraw = balance >= 1;
 
   async function submitWithdrawal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3472,7 +3472,7 @@ function WithdrawalModal({
             {balance} &euro;
           </strong>
           <p className="mt-2 text-sm font-bold text-[#4e596b]">
-            Minimum de retrait : 20 &euro;. Le paiement est envoy&eacute; vers
+            Minimum temporaire de test : 1 &euro;. Le paiement est envoy&eacute; vers
             ton compte PayPal.
           </p>
         </div>
@@ -3486,7 +3486,7 @@ function WithdrawalModal({
               <input
                 className="input"
                 max={balance}
-                min={20}
+                min={1}
                 onChange={(event) => setAmount(Number(event.target.value))}
                 required
                 type="number"
@@ -3516,7 +3516,7 @@ function WithdrawalModal({
         ) : (
           <div className="mt-4 rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold leading-6 text-[#4e596b]">
             Tu pourras demander un retrait dès que ton solde gains atteindra
-            20 &euro;.
+            1 &euro;.
           </div>
         )}
 

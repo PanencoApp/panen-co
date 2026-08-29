@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isPayPalLive,
+  isPayPalWebhookConfigured,
+  verifyPayPalWebhook,
+} from "@/lib/paypal/client";
 import { isServerSupabaseConfigured, serverSupabase } from "@/lib/supabase/server";
 
 const successEvents = new Set(["PAYMENT.PAYOUTS-ITEM.SUCCEEDED"]);
@@ -48,6 +53,21 @@ async function updateWalletForFinalStatus({
   return update.error?.message ?? null;
 }
 
+async function isVerifiedPayPalEvent(request: NextRequest, rawBody: string) {
+  if (!isPayPalLive && !isPayPalWebhookConfigured) {
+    return true;
+  }
+
+  return verifyPayPalWebhook({
+    authAlgo: request.headers.get("paypal-auth-algo") ?? "",
+    certUrl: request.headers.get("paypal-cert-url") ?? "",
+    rawBody,
+    transmissionId: request.headers.get("paypal-transmission-id") ?? "",
+    transmissionSig: request.headers.get("paypal-transmission-sig") ?? "",
+    transmissionTime: request.headers.get("paypal-transmission-time") ?? "",
+  });
+}
+
 export async function POST(request: NextRequest) {
   if (!isServerSupabaseConfigured || !serverSupabase) {
     return NextResponse.json(
@@ -56,19 +76,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json().catch(() => null)) as
-    | {
-        event_type?: string;
-        resource?: {
-          payout_item?: {
-            sender_item_id?: string;
-          };
-          transaction_status?: string;
-        };
-      }
-    | null;
-  const eventType = body?.event_type ?? "";
-  const withdrawalId = body?.resource?.payout_item?.sender_item_id ?? "";
+  const rawBody = await request.text();
+  const isVerified = await isVerifiedPayPalEvent(request, rawBody).catch(() => false);
+
+  if (!isVerified) {
+    return NextResponse.json({ error: "Signature PayPal invalide." }, { status: 400 });
+  }
+
+  const body = (JSON.parse(rawBody || "{}") as {
+    event_type?: string;
+    resource?: {
+      payout_item?: {
+        sender_item_id?: string;
+      };
+      transaction_status?: string;
+    };
+  }) ?? {};
+  const eventType = body.event_type ?? "";
+  const withdrawalId = body.resource?.payout_item?.sender_item_id ?? "";
 
   if (!withdrawalId) {
     return NextResponse.json({ ok: true });
@@ -109,7 +134,7 @@ export async function POST(request: NextRequest) {
     .from("withdrawal_requests")
     .update({
       provider_processed_at: new Date().toISOString(),
-      provider_status: body?.resource?.transaction_status ?? eventType,
+      provider_status: body.resource?.transaction_status ?? eventType,
       status: nextStatus,
       updated_at: new Date().toISOString(),
     })

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPayPalPayout, isPayPalConfigured } from "@/lib/paypal/client";
 import { isServerSupabaseConfigured, serverSupabase } from "@/lib/supabase/server";
 
-const MIN_WITHDRAWAL_EUROS = 20;
+const MIN_WITHDRAWAL_EUROS = 1;
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   if (amount < MIN_WITHDRAWAL_EUROS) {
     return NextResponse.json(
-      { error: "Le minimum de retrait est de 20 €." },
+      { error: "Le minimum de retrait temporaire est de 1 €." },
       { status: 400 },
     );
   }

@@ -21,6 +21,7 @@ type ConsumeResult = TokenResult & {
 };
 
 const MAX_DAILY_TOKENS = 5;
+const REWARDED_ADS_ENABLED = false;
 
 function parisDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("fr-CA", {
@@ -169,6 +170,14 @@ export async function addAdToken(userId: string): Promise<TokenResult> {
 
   if (current.error || !current.row) {
     return current;
+  }
+
+  if (!REWARDED_ADS_ENABLED) {
+    return {
+      tokens: current.tokens,
+      row: current.row,
+      error: new Error("Les jetons par publicité seront bientôt disponibles."),
+    };
   }
 
   if (current.tokens >= MAX_DAILY_TOKENS) {

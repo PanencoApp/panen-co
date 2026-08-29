@@ -58,7 +58,6 @@ import {
   type AdminWithdrawalRequest,
   type WithdrawalRequest,
 } from "@/lib/supabase/winnings";
-import { supabase } from "@/lib/supabase/client";
 import type {
   MatchOption,
   OnboardingStep,
@@ -3465,7 +3464,6 @@ function ProfileDrawer({
   >("history");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [notificationTestBusy, setNotificationTestBusy] = useState(false);
   const [supportBusy, setSupportBusy] = useState(false);
   const historyItems = predictions.map((prediction) => ({
     ...prediction,
@@ -3537,47 +3535,6 @@ function ProfileDrawer({
     });
   }
 
-  async function sendNotificationTest() {
-    if (!supabase) {
-      window.alert("Configuration Supabase incomplète.");
-      return;
-    }
-
-    setNotificationTestBusy(true);
-
-    try {
-      const session = await supabase.auth.getSession();
-      const accessToken = session.data.session?.access_token;
-
-      if (!accessToken) {
-        window.alert("Reconnecte-toi pour tester les notifications.");
-        return;
-      }
-
-      const response = await fetch("/api/notifications/test", {
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-        },
-        method: "POST",
-      });
-      const payload = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      if (!response.ok) {
-        window.alert(
-          payload?.error ??
-            "Notification non envoyée. Vérifie les variables OneSignal dans Vercel.",
-        );
-        return;
-      }
-
-      window.alert("Notification test envoyée.");
-    } finally {
-      setNotificationTestBusy(false);
-    }
-  }
-
   return (
     <aside className="fixed inset-0 z-50 bg-black/25 backdrop-blur-lg">
       <section className="ml-auto flex h-full w-[92%] max-w-[430px] flex-col border-l border-[#d9e1ea] bg-white p-5 shadow-[-18px_0_45px_rgba(15,23,42,.12)]">
@@ -3589,14 +3546,6 @@ function ProfileDrawer({
             type="button"
           >
             x
-          </button>
-          <button
-            className="mt-2 h-11 w-full rounded-2xl border border-[#00baff] bg-white text-sm font-black uppercase text-[#00baff] disabled:opacity-50"
-            disabled={notificationTestBusy}
-            onClick={sendNotificationTest}
-            type="button"
-          >
-            {notificationTestBusy ? "Envoi..." : "Tester les notifications"}
           </button>
         </div>
 

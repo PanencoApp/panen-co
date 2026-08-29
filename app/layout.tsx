@@ -30,6 +30,8 @@ export const viewport: Viewport = {
 const oneSignalAppId =
   process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID ??
   "9c37759d-d557-4216-8a83-9b13eda4ed84";
+const adsenseClient =
+  process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "ca-pub-793184864408957";
 
 export default function RootLayout({
   children,
@@ -38,6 +40,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="h-full antialiased">
+      <head>
+        <script
+          async
+          crossOrigin="anonymous"
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <Script

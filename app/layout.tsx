@@ -31,7 +31,7 @@ const oneSignalAppId =
   process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID ??
   "9c37759d-d557-4216-8a83-9b13eda4ed84";
 const adsenseClient =
-  process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "ca-pub-793184864408957";
+  process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "ca-pub-7931848644408957";
 
 export default function RootLayout({
   children,
@@ -41,6 +41,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className="h-full antialiased">
       <head>
+        <meta name="google-adsense-account" content={adsenseClient} />
         <script
           async
           crossOrigin="anonymous"

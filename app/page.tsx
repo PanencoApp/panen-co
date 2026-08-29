@@ -27,6 +27,14 @@ import {
   getOrCreateDailyTokens,
 } from "@/lib/supabase/tokens";
 import {
+  createSubscriptionCheckout,
+  getMySubscription,
+  isActiveSubscription,
+  openSubscriptionPortal,
+  type SubscriptionPlan,
+  type UserSubscription,
+} from "@/lib/supabase/subscriptions";
+import {
   finishPredictionDemoInSupabase,
   getMyPredictions,
   savePrediction,
@@ -391,6 +399,7 @@ export default function Home() {
   const [leaderboard, setLeaderboard] = useState<TopPlayer[]>([]);
   const [weeklyPoints, setWeeklyPoints] = useState(0);
   const [winningsBalance, setWinningsBalance] = useState(0);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
   const [challengeMatch, setChallengeMatch] = useState("");
   const [challengeStep, setChallengeStep] = useState<
@@ -628,6 +637,7 @@ export default function Home() {
           setLeaderboard([]);
           setWeeklyPoints(0);
           setWinningsBalance(0);
+          setSubscription(null);
           setWithdrawalRequests([]);
           setSeenResultIds([]);
           setResultPopupIds([]);
@@ -650,6 +660,8 @@ export default function Home() {
           password: "********",
         });
         setCurrentUserId(user.id);
+        const userSubscription = await getMySubscription(user.id);
+        if (isMounted) setSubscription(userSubscription.data);
         const dailyTokens = await getOrCreateDailyTokens(user.id);
         if (isMounted) setTokens(dailyTokens.tokens);
         const todayMatches = await getTodayMatches();
@@ -1234,6 +1246,28 @@ export default function Home() {
     );
   }
 
+  async function startSubscriptionCheckout(plan: SubscriptionPlan) {
+    const result = await createSubscriptionCheckout(plan);
+
+    if (result.error || !result.data) {
+      window.alert(result.error?.message ?? "Paiement indisponible pour le moment.");
+      return;
+    }
+
+    window.location.href = result.data.url;
+  }
+
+  async function manageSubscription() {
+    const result = await openSubscriptionPortal();
+
+    if (result.error || !result.data) {
+      window.alert(result.error?.message ?? "Gestion de l'abonnement indisponible.");
+      return;
+    }
+
+    window.location.href = result.data.url;
+  }
+
   async function completeOnboarding(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1277,6 +1311,8 @@ export default function Home() {
       setDailyMatches(todayMatches.data);
       setChallengeMatch(todayMatches.data[0]?.id ?? "");
       if (result.data.user && result.data.session) {
+        const userSubscription = await getMySubscription(result.data.user.id);
+        setSubscription(userSubscription.data);
         const dailyTokens = await getOrCreateDailyTokens(result.data.user.id);
         setTokens(dailyTokens.tokens);
         const savedPredictions = await getMyPredictions(
@@ -1300,6 +1336,7 @@ export default function Home() {
         setLeaderboard(weeklyPlayers);
         setWeeklyPoints(0);
         setWinningsBalance(0);
+        setSubscription(null);
         setWithdrawalRequests([]);
       }
       const sharedChallenge = pendingSharedChallenge ?? readSharedChallengeFromUrl();
@@ -1343,6 +1380,8 @@ export default function Home() {
         password,
       });
       setCurrentUserId(result.data.user.id);
+      const userSubscription = await getMySubscription(result.data.user.id);
+      setSubscription(userSubscription.data);
       const dailyTokens = await getOrCreateDailyTokens(result.data.user.id);
       setTokens(dailyTokens.tokens);
       const todayMatches = await getTodayMatches();
@@ -1449,6 +1488,7 @@ export default function Home() {
     setLeaderboard([]);
     setWeeklyPoints(0);
     setWinningsBalance(0);
+    setSubscription(null);
     setWithdrawalRequests([]);
     setSeenResultIds([]);
     setResultPopupIds([]);
@@ -2178,10 +2218,14 @@ export default function Home() {
             }
           }}
           onClose={() => setShowTokens(false)}
+          onSubscribe={startSubscriptionCheckout}
         />
       )}
       {showProfile && (
         <ProfileDrawer
+          isSubscribed={isActiveSubscription(subscription)}
+          onManageSubscription={manageSubscription}
+          onSubscribe={startSubscriptionCheckout}
           onClose={() => setShowProfile(false)}
           onLogout={logout}
           onOpenAdmin={openAdminDashboard}
@@ -3270,9 +3314,11 @@ function PredictionDetails({ pick }: { pick: PredictionPick }) {
 function TokenModal({
   onClose,
   onAd,
+  onSubscribe,
 }: {
   onClose: () => void;
   onAd: () => void | Promise<void>;
+  onSubscribe: (plan: SubscriptionPlan) => void | Promise<void>;
 }) {
   const [adStep, setAdStep] = useState<"idle" | "playing" | "granted">("idle");
 
@@ -3306,16 +3352,28 @@ function TokenModal({
           </span>
         </div>
         <div className="grid gap-3">
-          <button
-            className="rounded-2xl border border-[#00baff]/40 bg-[#00baff]/10 p-4 text-left"
-            onClick={() => alert("Paiement non active dans cette demo.")}
-            type="button"
-          >
+          <div className="rounded-2xl border border-[#00baff]/40 bg-[#00baff]/10 p-4">
             <strong className="block text-[#00baff]">Abonnement</strong>
             <span className="text-sm text-[#4e596b]">
               14,99 &euro;/mois sans engagement, ou 8,99 &euro;/mois pendant 1 an
             </span>
-          </button>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                className="h-11 rounded-xl bg-white text-xs font-black text-[#0b0f19]"
+                onClick={() => onSubscribe("monthly")}
+                type="button"
+              >
+                14,99 &euro;
+              </button>
+              <button
+                className="h-11 rounded-xl bg-[#00baff] text-xs font-black text-black"
+                onClick={() => onSubscribe("annual")}
+                type="button"
+              >
+                8,99 &euro;
+              </button>
+            </div>
+          </div>
           <button
             className="rounded-2xl border border-[#00baff]/40 bg-[#00baff]/10 p-4 text-left"
             disabled={adStep !== "idle"}
@@ -3492,6 +3550,9 @@ function WithdrawalModal({
 }
 
 function ProfileDrawer({
+  isSubscribed,
+  onManageSubscription,
+  onSubscribe,
   onClose,
   onLogout,
   onOpenAdmin,
@@ -3499,6 +3560,9 @@ function ProfileDrawer({
   userProfile,
   withdrawalRequests,
 }: {
+  isSubscribed: boolean;
+  onManageSubscription: () => void | Promise<void>;
+  onSubscribe: (plan: SubscriptionPlan) => void | Promise<void>;
   onClose: () => void;
   onLogout: () => void;
   onOpenAdmin: () => void;
@@ -3510,7 +3574,6 @@ function ProfileDrawer({
   const [section, setSection] = useState<
     "history" | "subscription" | "security" | "about" | "help" | "admin"
   >("history");
-  const [isSubscribed, setIsSubscribed] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [supportBusy, setSupportBusy] = useState(false);
   const historyItems = predictions.map((prediction) => ({
@@ -3697,20 +3760,29 @@ function ProfileDrawer({
               </div>
               {isSubscribed ? (
                 <button
-                  className="h-12 rounded-2xl border border-red-200 bg-red-50 font-black uppercase text-red-600"
-                  onClick={() => setIsSubscribed(false)}
+                  className="h-12 rounded-2xl border border-[#d9e1ea] bg-white font-black uppercase text-[#0b0f19]"
+                  onClick={onManageSubscription}
                   type="button"
                 >
-                  Resilier
+                  Gérer / résilier
                 </button>
               ) : (
-                <button
-                  className="h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black"
-                  onClick={() => setIsSubscribed(true)}
-                  type="button"
-                >
-                  Passer &agrave; 5 jetons/jour
-                </button>
+                <div className="grid gap-2">
+                  <button
+                    className="h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black"
+                    onClick={() => onSubscribe("monthly")}
+                    type="button"
+                  >
+                    Choisir 14,99 &euro;/mois
+                  </button>
+                  <button
+                    className="h-12 rounded-2xl border border-[#00baff] bg-white font-black uppercase text-[#00a7e6]"
+                    onClick={() => onSubscribe("annual")}
+                    type="button"
+                  >
+                    Choisir 8,99 &euro;/mois
+                  </button>
+                </div>
               )}
             </ProfilePanel>
           )}

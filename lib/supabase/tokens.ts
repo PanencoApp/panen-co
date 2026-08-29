@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase/client";
+﻿import { supabase } from "@/lib/supabase/client";
 
 type DailyTokenRow = {
   id: string;
@@ -47,6 +47,28 @@ function dailyFreeTokenAmount() {
   return parisDateParts().day === 5 ? 5 : 1;
 }
 
+async function getSubscriptionTokenAmount(userId: string, freeTokens: number) {
+  if (!supabase) return 0;
+
+  const subscription = await supabase
+    .from("subscriptions")
+    .select("status,current_period_end")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (subscription.error || !subscription.data) return 0;
+
+  const status = subscription.data.status ?? "inactive";
+  const periodEnd = subscription.data.current_period_end
+    ? new Date(subscription.data.current_period_end).getTime()
+    : null;
+  const isActive =
+    (status === "active" || status === "trialing") &&
+    (!periodEnd || periodEnd > Date.now());
+
+  return isActive ? Math.max(0, MAX_DAILY_TOKENS - freeTokens) : 0;
+}
+
 function countAvailableTokens(row: DailyTokenRow) {
   return Math.max(
     0,
@@ -64,7 +86,7 @@ function unavailable(error: Error): TokenResult {
 
 export async function getOrCreateDailyTokens(userId: string): Promise<TokenResult> {
   if (!supabase) {
-    return unavailable(new Error("Supabase n'est pas encore configure."));
+    return unavailable(new Error("Supabase n'est pas encore configuré."));
   }
 
   const tokenDate = todayKey();
@@ -81,11 +103,18 @@ export async function getOrCreateDailyTokens(userId: string): Promise<TokenResul
 
   if (existing.data) {
     const freeTokens = dailyFreeTokenAmount();
+    const subscriptionTokens = await getSubscriptionTokenAmount(userId, freeTokens);
 
-    if (existing.data.free_tokens < freeTokens) {
+    if (
+      existing.data.free_tokens < freeTokens ||
+      existing.data.subscription_tokens !== subscriptionTokens
+    ) {
       const upgraded = await supabase
         .from("daily_tokens")
-        .update({ free_tokens: freeTokens })
+        .update({
+          free_tokens: Math.max(existing.data.free_tokens, freeTokens),
+          subscription_tokens: subscriptionTokens,
+        })
         .eq("id", existing.data.id)
         .select("*")
         .single();
@@ -106,14 +135,15 @@ export async function getOrCreateDailyTokens(userId: string): Promise<TokenResul
     };
   }
 
+  const freeTokens = dailyFreeTokenAmount();
   const created = await supabase
     .from("daily_tokens")
     .insert({
       user_id: userId,
       token_date: tokenDate,
-      free_tokens: dailyFreeTokenAmount(),
+      free_tokens: freeTokens,
       ad_tokens: 0,
-      subscription_tokens: 0,
+      subscription_tokens: await getSubscriptionTokenAmount(userId, freeTokens),
       used_tokens: 0,
     })
     .select("*")
@@ -132,7 +162,7 @@ export async function getOrCreateDailyTokens(userId: string): Promise<TokenResul
 
 export async function addAdToken(userId: string): Promise<TokenResult> {
   if (!supabase) {
-    return unavailable(new Error("Supabase n'est pas encore configure."));
+    return unavailable(new Error("Supabase n'est pas encore configuré."));
   }
 
   const current = await getOrCreateDailyTokens(userId);
@@ -179,7 +209,7 @@ export async function addAdToken(userId: string): Promise<TokenResult> {
 export async function consumeDailyToken(userId: string): Promise<ConsumeResult> {
   if (!supabase) {
     return {
-      ...unavailable(new Error("Supabase n'est pas encore configure.")),
+      ...unavailable(new Error("Supabase n'est pas encore configuré.")),
       ok: false,
     };
   }
@@ -225,3 +255,5 @@ export async function consumeDailyToken(userId: string): Promise<ConsumeResult> 
     ok: true,
   };
 }
+
+

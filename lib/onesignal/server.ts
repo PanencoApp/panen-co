@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 type PushTarget =
   | {
       externalUserIds: string[];
@@ -27,6 +29,21 @@ export const isOneSignalConfigured = Boolean(
   oneSignalAppId && oneSignalRestApiKey,
 );
 
+function toOneSignalUuid(value?: string) {
+  if (!value) return undefined;
+
+  const hash = createHash("sha256").update(value).digest("hex").slice(0, 32);
+  const uuid = [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    `4${hash.slice(13, 16)}`,
+    `${(8 + (Number.parseInt(hash[16] ?? "0", 16) % 4)).toString(16)}${hash.slice(17, 20)}`,
+    hash.slice(20, 32),
+  ].join("-");
+
+  return uuid;
+}
+
 export async function sendPushNotification({
   body,
   idempotencyKey,
@@ -52,7 +69,7 @@ export async function sendPushNotification({
       en: title,
       fr: title,
     },
-    idempotency_key: idempotencyKey,
+    idempotency_key: toOneSignalUuid(idempotencyKey),
     send_after: sendAfter,
     target_channel: "push",
     url,
@@ -144,4 +161,3 @@ export function sendPushToEveryone({
     url,
   });
 }
-

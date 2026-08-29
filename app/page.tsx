@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -1623,7 +1623,7 @@ export default function Home() {
 
             <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.10)]">
               <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-3xl border border-[#00baff] text-3xl shadow-[0_0_26px_rgba(0,186,255,.22)]">
-                ⚽
+                ?
               </div>
               <h1 className="text-center text-2xl font-black uppercase">
                 Matchs du jour
@@ -2022,10 +2022,10 @@ export default function Home() {
                       }
                     >
                       {rankDelta > 0
-                        ? `↑ ${rankDelta}`
+                        ? `? ${rankDelta}`
                         : rankDelta < 0
-                          ? `↓ ${Math.abs(rankDelta)}`
-                          : "→ 0"}
+                          ? `? ${Math.abs(rankDelta)}`
+                          : "? 0"}
                     </span>
                     <strong className="text-5xl font-black text-[#00baff] drop-shadow-[0_0_18px_rgba(0,186,255,.45)]">
                       {updatedWeeklyRank}
@@ -2783,7 +2783,7 @@ function ScorerField({ players }: { players: PlayerOption[] }) {
             >
               {selectedScorerValue === player.name && (
                 <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#00baff] text-xs font-black text-black">
-                  ✓
+                  ?
                 </span>
               )}
               {player.photo ? (
@@ -3080,7 +3080,7 @@ function ChallengeInProgressCard({
               onClick={onShare}
               type="button"
             >
-              ↗
+              ?
             </button>
           </div>
         </>
@@ -3562,6 +3562,7 @@ function ProfileDrawer({
     "history" | "subscription" | "security" | "about" | "help" | "admin"
   >(initialSection);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [historyTab, setHistoryTab] = useState<"predictions" | "withdrawals">("predictions");
   const [now] = useState(() => Date.now());
   const commitmentEndDate = subscription?.commitmentUntil
     ? new Date(subscription.commitmentUntil)
@@ -3810,12 +3811,72 @@ function ProfileDrawer({
 
           {section === "history" && (
             <ProfilePanel title="Historique">
-              {withdrawalRequests.length > 0 && (
-                <div className="grid gap-2">
-                  <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#4e596b]">
-                    Retraits
-                  </h4>
-                  {withdrawalRequests.map((request) => (
+              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-1">
+                {[
+                  ["predictions", "Prédictions"],
+                  ["withdrawals", "Retraits"],
+                ].map(([id, label]) => (
+                  <button
+                    className={
+                      (historyTab === id
+                        ? "bg-[#00baff] text-black shadow-[0_10px_20px_rgba(0,186,255,.18)]"
+                        : "bg-transparent text-[#4e596b]") +
+                      " h-10 rounded-xl text-sm font-black"
+                    }
+                    key={id}
+                    onClick={() => setHistoryTab(id as "predictions" | "withdrawals")}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {historyTab === "predictions" &&
+                (historyItems.length > 0 ? (
+                  historyItems.map((item) => (
+                    <div
+                      className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
+                      key={item.id}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <strong className="block">{item.matchLabel}</strong>
+                          <span className="text-sm font-bold text-[#4e596b]">
+                            {item.date}
+                          </span>
+                        </div>
+                        <b
+                          className={
+                            (item.status === "done"
+                              ? "bg-[#00baff] text-black"
+                              : "bg-[#eef3f8] text-[#4e596b]") +
+                            " rounded-xl px-3 py-2 text-sm"
+                          }
+                        >
+                          {item.status === "done"
+                            ? `${item.score ?? 0} pts`
+                            : "En cours"}
+                        </b>
+                      </div>
+                      <details className="mt-3 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-3">
+                        <summary className="cursor-pointer text-sm font-black text-[#00baff]">
+                          Voir ma grille
+                        </summary>
+                        <PredictionDetails pick={item.pick} />
+                      </details>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
+                    Aucune prédiction pour le moment. Dès que tu valides une
+                    grille, elle apparaît ici.
+                  </div>
+                ))}
+
+              {historyTab === "withdrawals" &&
+                (withdrawalRequests.length > 0 ? (
+                  withdrawalRequests.map((request) => (
                     <div
                       className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
                       key={request.id}
@@ -3843,56 +3904,14 @@ function ProfileDrawer({
                         </b>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#4e596b]">
-                Pr&eacute;dictions
-              </h4>
-              {historyItems.length > 0 ? (
-                historyItems.map((item) => (
-                  <div
-                    className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
-                    key={item.id}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <strong className="block">{item.matchLabel}</strong>
-                        <span className="text-sm font-bold text-[#4e596b]">
-                          {item.date}
-                        </span>
-                      </div>
-                      <b
-                        className={
-                          (item.status === "done"
-                            ? "bg-[#00baff] text-black"
-                            : "bg-[#eef3f8] text-[#4e596b]") +
-                          " rounded-xl px-3 py-2 text-sm"
-                        }
-                      >
-                        {item.status === "done"
-                          ? `${item.score ?? 0} pts`
-                          : "En cours"}
-                      </b>
-                    </div>
-                    <details className="mt-3 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-3">
-                      <summary className="cursor-pointer text-sm font-black text-[#00baff]">
-                        Voir ma grille
-                      </summary>
-                      <PredictionDetails pick={item.pick} />
-                    </details>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
+                    Aucun retrait demandé pour le moment.
                   </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
-                  Aucune pr&eacute;diction pour le moment. D&egrave;s que tu valides
-                  une grille, elle appara&icirc;t ici.
-                </div>
-              )}
+                ))}
             </ProfilePanel>
           )}
-
           {section === "security" && (
             <ProfilePanel title="Securite">
               <input className="input" placeholder="Mot de passe actuel" type="password" />
@@ -4325,6 +4344,7 @@ function InfoBlock({ title, text }: { title: string; text: string }) {
     </div>
   );
 }
+
 
 
 

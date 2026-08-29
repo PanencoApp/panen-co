@@ -281,6 +281,28 @@ function scoreFixture(fixture: ApiFootballFixture) {
   );
 }
 
+function deterministicNumber(value: string) {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) % 9973;
+  }
+
+  return hash;
+}
+
+function rotatingTopLeagueScore(fixture: ApiFootballFixture) {
+  const leagueId = fixture.league?.id ?? 0;
+  const leagueScore = leaguePriority.get(leagueId) ?? leagueNameScore(fixture);
+
+  if (leagueScore > 20) return Number.MAX_SAFE_INTEGER;
+
+  const leagueKey = fixtureLeagueKey(fixture);
+  const rotation = deterministicNumber(`${todayKey()}-${leagueKey}`) % 20;
+
+  return leagueScore * 2 + rotation;
+}
+
 function fixtureLeagueKey(fixture: ApiFootballFixture) {
   return String(fixture.league?.id ?? fixture.league?.name ?? "unknown");
 }
@@ -298,10 +320,38 @@ function isMajorInternationalFixture(fixture: ApiFootballFixture) {
 
 function pickDailyFixtures(fixtures: ApiFootballFixture[]) {
   const sortedFixtures = [...fixtures].sort((a, b) => scoreFixture(a) - scoreFixture(b));
+  const topTwentyByLeague = new Map<string, ApiFootballFixture[]>();
   const selected: ApiFootballFixture[] = [];
   const byLeague = new Map<string, number>();
 
   for (const fixture of sortedFixtures) {
+    if (rotatingTopLeagueScore(fixture) === Number.MAX_SAFE_INTEGER) continue;
+
+    const leagueKey = fixtureLeagueKey(fixture);
+    const group = topTwentyByLeague.get(leagueKey) ?? [];
+
+    group.push(fixture);
+    topTwentyByLeague.set(leagueKey, group);
+  }
+
+  const topTwentyGroups = [...topTwentyByLeague.entries()]
+    .map(([leagueKey, group]) => ({
+      fixtures: group.sort((a, b) => scoreFixture(a) - scoreFixture(b)),
+      leagueKey,
+      rotationScore: rotatingTopLeagueScore(group[0]),
+    }))
+    .sort((a, b) => a.rotationScore - b.rotationScore);
+
+  for (const group of topTwentyGroups) {
+    selected.push(group.fixtures[0]);
+    byLeague.set(group.leagueKey, 1);
+
+    if (selected.length === 5) return selected;
+  }
+
+  for (const fixture of sortedFixtures) {
+    if (selected.includes(fixture)) continue;
+
     const leagueKey = fixtureLeagueKey(fixture);
     const leagueCount = byLeague.get(leagueKey) ?? 0;
 

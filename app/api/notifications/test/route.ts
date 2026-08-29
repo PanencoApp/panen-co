@@ -7,6 +7,45 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function formatOneSignalDetails(details: unknown) {
+  if (!details || typeof details !== "object") return null;
+
+  const payload = details as {
+    errors?: unknown;
+    warnings?: unknown;
+    recipients?: unknown;
+  };
+  const parts = [];
+
+  if (payload.errors) {
+    parts.push(
+      `Erreur OneSignal : ${
+        Array.isArray(payload.errors)
+          ? payload.errors.join(", ")
+          : JSON.stringify(payload.errors)
+      }`,
+    );
+  }
+
+  if (payload.warnings) {
+    parts.push(
+      `Alerte OneSignal : ${
+        Array.isArray(payload.warnings)
+          ? payload.warnings.join(", ")
+          : JSON.stringify(payload.warnings)
+      }`,
+    );
+  }
+
+  if (payload.recipients === 0) {
+    parts.push(
+      "Aucun téléphone relié à ce compte. Ouvre l'app sur ton téléphone, active les notifications, puis réessaie.",
+    );
+  }
+
+  return parts.join(" ");
+}
+
 export async function POST(request: NextRequest) {
   const token = request.headers.get("authorization")?.replace("Bearer ", "");
 
@@ -37,12 +76,13 @@ export async function POST(request: NextRequest) {
   });
 
   if (sent.error) {
+    const details = formatOneSignalDetails(sent.data);
+
     return NextResponse.json(
-      { error: sent.error.message, details: sent.data },
+      { error: details ?? sent.error.message, details: sent.data },
       { status: 500 },
     );
   }
 
   return NextResponse.json({ ok: true, details: sent.data });
 }
-

@@ -10,6 +10,7 @@ type ApiFootballFixture = {
     };
   };
   league?: {
+    country?: string;
     id?: number;
     name?: string;
   };
@@ -32,86 +33,114 @@ type ApiFootballFixture = {
 };
 
 const leaguePriority = new Map<number, number>([
-  // International
+  // Top 1 à 10 : sommets mondiaux
+  [2, 1],
   [1, 1],
-  [4, 2],
-  [5, 3],
-  [9, 4],
-  [2, 5],
-  [3, 6],
-  // France
+  [39, 3],
+  [140, 4],
+  [4, 5],
+  [13, 6],
+  [135, 7],
+  [78, 8],
+  [9, 9],
   [61, 10],
-  [62, 11],
-  // Angleterre
-  [39, 20],
-  [40, 21],
-  // Espagne
-  [140, 30],
-  [141, 31],
-  // Italie
-  [135, 40],
-  [136, 41],
-  // Allemagne
-  [78, 50],
-  [79, 51],
-  // Portugal
-  [94, 60],
-  [95, 61],
-  // Pays-Bas
-  [88, 70],
-  [89, 71],
-  // Belgique
-  [144, 80],
-  [145, 81],
-  // Turquie
-  [203, 90],
-  [204, 91],
-  // Bresil
-  [71, 100],
-  [72, 101],
-  // Argentine
-  [128, 110],
-  [129, 111],
-  // Etats-Unis, Canada, Mexique
-  [253, 120],
-  [255, 121],
-  [262, 130],
-  [263, 131],
+  // Top 11 à 20 : second tir européen et Amériques
+  [3, 11],
+  [71, 12],
+  [15, 13],
+  [128, 14],
+  [40, 15],
+  [94, 16],
+  [253, 17],
+  [88, 18],
+  [262, 19],
+  [6, 20],
+  // Top 21 à 30 : coupes nationales et ligues émergentes
+  [45, 21],
+  [848, 22],
+  [307, 23],
+  [143, 24],
+  [144, 25],
+  [203, 26],
+  [81, 27],
+  [137, 28],
+  [66, 29],
+  [11, 30],
+  // Top 31 à 40 : Asie, CONCACAF et compétitions secondaires
+  [17, 31],
+  [22, 32],
+  [5, 33],
+  [16, 34],
+  [12, 35],
+  [141, 36],
+  [136, 37],
+  [79, 38],
+  [179, 39],
+  [98, 40],
+  // Top 41 à 50 : championnats régionaux et espoirs
+  [207, 41],
+  [239, 42],
+  [292, 43],
+  [72, 44],
+  [197, 45],
+  [106, 46],
+  [218, 47],
+  [113, 48],
+  [531, 49],
 ]);
 
-const leagueNamePriority: Array<[RegExp, number]> = [
-  [/world cup/i, 1],
-  [/\beuro\b|european championship/i, 2],
-  [/nations league/i, 3],
-  [/copa america/i, 4],
-  [/champions league/i, 5],
-  [/europa league/i, 6],
-  [/ligue 1|mcdonald/i, 10],
-  [/ligue 2|bkt/i, 11],
-  [/premier league/i, 20],
-  [/championship/i, 21],
-  [/hypermotion|segunda division/i, 31],
-  [/laliga|la liga|primera division/i, 30],
-  [/serie b/i, 41],
-  [/serie a|enilive/i, 40],
-  [/2\. bundesliga|zweite bundesliga/i, 51],
-  [/bundesliga$/i, 50],
-  [/liga portugal 2|segunda liga|meu super/i, 61],
-  [/liga portugal|primeira liga|betclic/i, 60],
-  [/eredivisie/i, 70],
-  [/keuken kampioen|eerste divisie/i, 71],
-  [/jupiler pro league|first division a/i, 80],
-  [/challenger pro league|first division b/i, 81],
-  [/super lig|süper lig/i, 90],
-  [/1\. lig/i, 91],
-  [/brasileir|serie a/i, 100],
-  [/brasil.*serie b|série b/i, 101],
-  [/liga profesional|primera division/i, 110],
-  [/primera nacional/i, 111],
-  [/major league soccer|\bmls\b/i, 120],
-  [/usl championship/i, 121],
-  [/liga mx/i, 130],
-  [/liga de expansion|expansión mx/i, 131],
+const internationalLeagueNamePriority: Array<[RegExp, number]> = [
+  [/club world cup|coupe du monde des clubs/i, 13],
+  [/afc champions league|ligue des champions de l'afc/i, 31],
+  [/concacaf champions/i, 34],
+  [/caf champions league|ligue des champions de la caf/i, 35],
+  [/uefa champions league|ligue des champions de l'uefa|champions league/i, 1],
+  [/fifa world cup|world cup|coupe du monde/i, 2],
+  [/\beuro\b|european championship|championnat d'europe/i, 5],
+  [/libertadores/i, 6],
+  [/copa america/i, 9],
+  [/europa league|ligue europa/i, 11],
+  [/africa cup of nations|coupe d'afrique|can\b/i, 20],
+  [/fa cup/i, 21],
+  [/conference league|ligue conférence/i, 22],
+  [/copa sudamericana|sudamericana/i, 30],
+  [/gold cup/i, 32],
+  [/nations league|ligue des nations/i, 33],
+  [/uefa super cup|supercopa de europa|super coupe/i, 49],
+];
+
+const domesticLeagueNamePriority: Array<[RegExp, RegExp, number]> = [
+  [/france/i, /ligue 1|mcdonald/i, 10],
+  [/england/i, /premier league/i, 3],
+  [/spain/i, /laliga|la liga/i, 4],
+  [/italy/i, /serie a|enilive/i, 7],
+  [/germany/i, /bundesliga$/i, 8],
+  [/brazil/i, /brasileir|serie a/i, 12],
+  [/argentina/i, /liga profesional|primera division/i, 14],
+  [/england/i, /championship/i, 15],
+  [/portugal/i, /liga portugal|primeira liga|betclic/i, 16],
+  [/usa|united states|canada/i, /major league soccer|\bmls\b/i, 17],
+  [/netherlands/i, /eredivisie/i, 18],
+  [/mexico/i, /liga mx/i, 19],
+  [/spain/i, /copa del rey/i, 24],
+  [/belgium/i, /jupiler pro league|first division a/i, 25],
+  [/turkey/i, /super lig|süper lig/i, 26],
+  [/germany/i, /dfb pokal|dfb-pokal/i, 27],
+  [/italy/i, /coppa italia/i, 28],
+  [/france/i, /coupe de france/i, 29],
+  [/spain/i, /hypermotion|segunda division/i, 36],
+  [/italy/i, /serie b/i, 37],
+  [/germany/i, /2\. bundesliga|zweite bundesliga/i, 38],
+  [/scotland/i, /premiership/i, 39],
+  [/japan/i, /j1 league/i, 40],
+  [/switzerland/i, /super league/i, 41],
+  [/argentina|colombia/i, /superliga|primera a|categoría primera a/i, 42],
+  [/south korea|korea/i, /k league 1/i, 43],
+  [/brazil/i, /serie b|série b/i, 44],
+  [/greece/i, /super league/i, 45],
+  [/poland/i, /ekstraklasa|sdr/i, 46],
+  [/austria/i, /bundesliga/i, 47],
+  [/sweden/i, /allsvenskan/i, 48],
 ];
 
 const teamPriority: Array<[RegExp, number]> = [
@@ -196,6 +225,23 @@ function fixtureAttractiveness(fixture: ApiFootballFixture) {
   return teamScore(home) + teamScore(away);
 }
 
+function leagueNameScore(fixture: ApiFootballFixture) {
+  const leagueName = fixture.league?.name ?? "";
+  const country = fixture.league?.country ?? "";
+  const internationalScore = internationalLeagueNamePriority.find(([pattern]) =>
+    pattern.test(leagueName),
+  )?.[1];
+
+  if (internationalScore) return internationalScore;
+
+  return (
+    domesticLeagueNamePriority.find(
+      ([countryPattern, leaguePattern]) =>
+        countryPattern.test(country) && leaguePattern.test(leagueName),
+    )?.[2] ?? 99
+  );
+}
+
 function hasReliableResultCoverage(fixture: ApiFootballFixture) {
   const fixtureId = fixture.fixture?.id;
   const home = fixture.teams?.home?.name ?? "";
@@ -213,21 +259,17 @@ function hasReliableResultCoverage(fixture: ApiFootballFixture) {
 
 function isKnownPriorityFixture(fixture: ApiFootballFixture) {
   const leagueId = fixture.league?.id ?? 0;
-  const leagueName = fixture.league?.name ?? "";
 
   return (
     leaguePriority.has(leagueId) ||
-    leagueNamePriority.some(([pattern]) => pattern.test(leagueName)) ||
+    leagueNameScore(fixture) < 99 ||
     fixtureAttractiveness(fixture) < 50
   );
 }
 
 function scoreFixture(fixture: ApiFootballFixture) {
   const leagueId = fixture.league?.id ?? 0;
-  const leagueName = fixture.league?.name ?? "";
-  const namePriority =
-    leagueNamePriority.find(([pattern]) => pattern.test(leagueName))?.[1] ?? 99;
-  const leagueScore = leaguePriority.get(leagueId) ?? namePriority;
+  const leagueScore = leaguePriority.get(leagueId) ?? leagueNameScore(fixture);
   const kickoff = fixture.fixture?.date
     ? new Date(fixture.fixture.date).getTime()
     : Number.MAX_SAFE_INTEGER;
@@ -237,6 +279,49 @@ function scoreFixture(fixture: ApiFootballFixture) {
     fixtureAttractiveness(fixture) * 10_000_000_000 +
     kickoff
   );
+}
+
+function fixtureLeagueKey(fixture: ApiFootballFixture) {
+  return String(fixture.league?.id ?? fixture.league?.name ?? "unknown");
+}
+
+function isMajorInternationalFixture(fixture: ApiFootballFixture) {
+  const country = fixture.league?.country ?? "";
+  const leagueName = fixture.league?.name ?? "";
+  const isInternationalCompetition =
+    /world|euro|copa america|nations league|africa cup|gold cup/i.test(
+      `${country} ${leagueName}`,
+    );
+
+  return isInternationalCompetition && fixtureAttractiveness(fixture) <= 10;
+}
+
+function pickDailyFixtures(fixtures: ApiFootballFixture[]) {
+  const sortedFixtures = [...fixtures].sort((a, b) => scoreFixture(a) - scoreFixture(b));
+  const selected: ApiFootballFixture[] = [];
+  const byLeague = new Map<string, number>();
+
+  for (const fixture of sortedFixtures) {
+    const leagueKey = fixtureLeagueKey(fixture);
+    const leagueCount = byLeague.get(leagueKey) ?? 0;
+
+    if (leagueCount >= 2 && !isMajorInternationalFixture(fixture)) continue;
+
+    selected.push(fixture);
+    byLeague.set(leagueKey, leagueCount + 1);
+
+    if (selected.length === 5) return selected;
+  }
+
+  for (const fixture of sortedFixtures) {
+    if (selected.includes(fixture)) continue;
+
+    selected.push(fixture);
+
+    if (selected.length === 5) return selected;
+  }
+
+  return selected;
 }
 
 function toMatch(fixture: ApiFootballFixture) {
@@ -266,14 +351,14 @@ function toMatch(fixture: ApiFootballFixture) {
     statusLabel: isPredictable
       ? "Ouvert"
       : status === "FT"
-        ? "Termine"
+        ? "Terminé"
         : status === "HT"
           ? "Mi-temps"
           : status === "1H" || status === "2H"
             ? `Live ${fixture.fixture?.status?.elapsed ?? ""}'`
             : kickoffHasPassed
-              ? "Commence"
-              : "Verrouille",
+              ? "Commencé"
+              : "Verrouillé",
   };
 }
 
@@ -296,7 +381,7 @@ export async function GET() {
       headers: {
         "x-apisports-key": apiKey,
       },
-      next: { revalidate: 60 * 60 },
+      next: { revalidate: 10 * 60 },
     });
 
     if (!response.ok) {
@@ -315,9 +400,10 @@ export async function GET() {
     const secondaryFixtures = reliableFixtures.filter(
       (fixture) => !isKnownPriorityFixture(fixture),
     );
-    const playableFixtures = [...priorityFixtures, ...secondaryFixtures]
-      .sort((a, b) => scoreFixture(a) - scoreFixture(b))
-      .slice(0, 5);
+    const playableFixtures = pickDailyFixtures([
+      ...priorityFixtures,
+      ...secondaryFixtures,
+    ]);
     const playable = playableFixtures.map(toMatch);
 
     return NextResponse.json({

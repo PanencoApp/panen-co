@@ -3,11 +3,11 @@ export const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 
 export const stripeMonthlyPriceId =
   process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PRICE_ID ??
-  "price_1U9ilhFON9sMTBN6gOTtBWeb";
+  "price_1U9je7FON9sMTBN6AUloFZ7x";
 
 export const stripeAnnualPriceId =
   process.env.NEXT_PUBLIC_STRIPE_YEARLY_PRICE_ID ??
-  "price_1U9imYFON9sMTBN6l1MLzWOx";
+  "price_1U9jfeFON9sMTBN6MJZYTjt5";
 
 export const appUrl =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://panen-co.vercel.app";

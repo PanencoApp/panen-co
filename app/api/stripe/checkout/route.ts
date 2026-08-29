@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
     | null;
   const plan = body?.plan === "annual" ? "annual" : "monthly";
   const priceId = plan === "annual" ? stripeAnnualPriceId : stripeMonthlyPriceId;
+  const commitmentMonths = plan === "annual" ? "12" : "0";
   const origin = request.headers.get("origin") || appUrl;
 
   const checkout = await fetch("https://api.stripe.com/v1/checkout/sessions", {
@@ -62,8 +63,11 @@ export async function POST(request: NextRequest) {
       "line_items[0][price]": priceId,
       "line_items[0][quantity]": "1",
       "metadata[plan]": plan,
+      "metadata[price_id]": priceId,
       "metadata[user_id]": user.id,
       "mode": "subscription",
+      "subscription_data[metadata][commitment_months]": commitmentMonths,
+      "subscription_data[metadata][price_id]": priceId,
       "subscription_data[metadata][plan]": plan,
       "subscription_data[metadata][user_id]": user.id,
       "success_url": `${origin}/?stripe=success`,

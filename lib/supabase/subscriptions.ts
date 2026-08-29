@@ -3,7 +3,9 @@ import { supabase } from "@/lib/supabase/client";
 export type SubscriptionPlan = "annual" | "monthly";
 
 export type UserSubscription = {
+  commitmentUntil: string | null;
   currentPeriodEnd: string | null;
+  plan: SubscriptionPlan | null;
   status: string;
 };
 
@@ -24,7 +26,7 @@ export async function getMySubscription(userId: string) {
 
   const result = await supabase
     .from("subscriptions")
-    .select("status,current_period_end")
+    .select("status,current_period_end,plan,commitment_until")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -35,7 +37,12 @@ export async function getMySubscription(userId: string) {
   return {
     data: result.data
       ? {
+          commitmentUntil: result.data.commitment_until ?? null,
           currentPeriodEnd: result.data.current_period_end ?? null,
+          plan:
+            result.data.plan === "annual" || result.data.plan === "monthly"
+              ? result.data.plan
+              : null,
           status: result.data.status ?? "inactive",
         }
       : null,

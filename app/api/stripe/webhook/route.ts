@@ -56,9 +56,21 @@ function periodEnd(value: unknown) {
   return new Date(value * 1000).toISOString();
 }
 
+function oneYearCommitmentFromNow(plan: unknown) {
+  if (plan !== "annual") return null;
+
+  const date = new Date();
+  date.setFullYear(date.getFullYear() + 1);
+
+  return date.toISOString();
+}
+
 async function upsertSubscription(payload: {
+  commitmentUntil?: string | null;
   customerId?: unknown;
   periodEnd?: unknown;
+  plan?: unknown;
+  priceId?: unknown;
   status?: unknown;
   subscriptionId?: unknown;
   userId?: unknown;
@@ -69,7 +81,10 @@ async function upsertSubscription(payload: {
 
   await serverSupabase!.from("subscriptions").upsert(
     {
+      commitment_until: payload.commitmentUntil ?? null,
       current_period_end: periodEnd(payload.periodEnd),
+      plan: typeof payload.plan === "string" ? payload.plan : null,
+      price_id: typeof payload.priceId === "string" ? payload.priceId : null,
       provider: "stripe",
       provider_customer_id:
         typeof payload.customerId === "string" ? payload.customerId : null,
@@ -126,7 +141,10 @@ export async function POST(request: NextRequest) {
     const metadata = (object.metadata ?? {}) as Record<string, unknown>;
 
     await upsertSubscription({
+      commitmentUntil: oneYearCommitmentFromNow(metadata.plan),
       customerId: object.customer,
+      plan: metadata.plan,
+      priceId: metadata.price_id,
       status: "active",
       subscriptionId: object.subscription,
       userId: object.client_reference_id ?? metadata.user_id,

@@ -467,6 +467,7 @@ export default function Home() {
   );
   const homeDonePredictions = popupDonePredictions;
   const visibleDonePredictions = popupDonePredictions;
+  const hasActiveSubscription = isActiveSubscription(subscription);
   const sortedVisibleDonePredictions = [...visibleDonePredictions].sort(
     (left, right) => (right.score ?? 0) - (left.score ?? 0),
   );
@@ -1587,7 +1588,9 @@ export default function Home() {
                   </p>
                   <strong className="text-4xl text-[#00baff]">{tokens}</strong>
                   <p className="mt-1 text-xs font-bold text-[#5f6b7f]">
-                    1 jeton gratuit par jour · non cumulable
+                    {hasActiveSubscription
+                      ? "5 jetons par jour · non cumulable"
+                      : "1 jeton gratuit par jour · non cumulable"}
                   </p>
                 </div>
                 <button
@@ -2226,6 +2229,7 @@ export default function Home() {
           isSubscribed={isActiveSubscription(subscription)}
           onManageSubscription={manageSubscription}
           onSubscribe={startSubscriptionCheckout}
+          subscription={subscription}
           onClose={() => setShowProfile(false)}
           onLogout={logout}
           onOpenAdmin={openAdminDashboard}
@@ -3352,25 +3356,38 @@ function TokenModal({
           </span>
         </div>
         <div className="grid gap-3">
-          <div className="rounded-2xl border border-[#00baff]/40 bg-[#00baff]/10 p-4">
-            <strong className="block text-[#00baff]">Abonnement</strong>
-            <span className="text-sm text-[#4e596b]">
-              14,99 &euro;/mois sans engagement, ou 8,99 &euro;/mois pendant 1 an
+          <div className="rounded-2xl border border-[#00baff]/50 bg-gradient-to-br from-[#e9faff] to-white p-4">
+            <strong className="block text-lg text-[#00a7e6]">
+              Bénéficiez de 5 jetons par jour
+            </strong>
+            <span className="mt-1 block text-sm font-bold leading-5 text-[#4e596b]">
+              Plus de pronostics, plus d’occasions de grimper au classement.
             </span>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid gap-2">
               <button
-                className="h-11 rounded-xl bg-white text-xs font-black text-[#0b0f19]"
+                className="rounded-2xl bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,.08)]"
                 onClick={() => onSubscribe("monthly")}
                 type="button"
               >
-                14,99 &euro;
+                <span className="block text-xs font-black uppercase tracking-[0.16em] text-[#697386]">
+                  Sans engagement
+                </span>
+                <strong className="mt-1 block text-xl text-[#0b0f19]">
+                  14,99 &euro;/mois
+                </strong>
               </button>
               <button
-                className="h-11 rounded-xl bg-[#00baff] text-xs font-black text-black"
+                className="rounded-2xl bg-[#00baff] p-3 text-left text-black shadow-[0_12px_26px_rgba(0,186,255,.28)]"
                 onClick={() => onSubscribe("annual")}
                 type="button"
               >
-                8,99 &euro;
+                <span className="block text-xs font-black uppercase tracking-[0.16em]">
+                  Engagement 1 an
+                </span>
+                <strong className="mt-1 block text-xl">
+                  8,99 &euro;/mois
+                </strong>
+                <span className="text-xs font-black">72 &euro; d’économie</span>
               </button>
             </div>
           </div>
@@ -3553,6 +3570,7 @@ function ProfileDrawer({
   isSubscribed,
   onManageSubscription,
   onSubscribe,
+  subscription,
   onClose,
   onLogout,
   onOpenAdmin,
@@ -3563,6 +3581,7 @@ function ProfileDrawer({
   isSubscribed: boolean;
   onManageSubscription: () => void | Promise<void>;
   onSubscribe: (plan: SubscriptionPlan) => void | Promise<void>;
+  subscription: UserSubscription | null;
   onClose: () => void;
   onLogout: () => void;
   onOpenAdmin: () => void;
@@ -3575,6 +3594,15 @@ function ProfileDrawer({
     "history" | "subscription" | "security" | "about" | "help" | "admin"
   >("history");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [now] = useState(() => Date.now());
+  const commitmentEndDate = subscription?.commitmentUntil
+    ? new Date(subscription.commitmentUntil)
+    : null;
+  const isAnnualCommitmentActive =
+    isSubscribed &&
+    subscription?.plan === "annual" &&
+    commitmentEndDate !== null &&
+    commitmentEndDate.getTime() > now;
   const [supportBusy, setSupportBusy] = useState(false);
   const historyItems = predictions.map((prediction) => ({
     ...prediction,
@@ -3728,13 +3756,15 @@ function ProfileDrawer({
                   {isSubscribed ? "Abonnement en cours" : "Pas d'abonnement"}
                 </strong>
                 <p className="mt-2 text-sm font-bold leading-6 text-[#4e596b]">
-                  Profitez de 5 jetons par jour pour multiplier vos pronostics
-                  et viser le sommet du classement. Choisissez l&apos;offre
-                  mensuelle sans engagement ou l&apos;offre annuelle engagée avec
-                  72 &euro; d&apos;économie.
+                  Bénéficiez de 5 jetons par jour pour multiplier vos pronostics
+                  et tenter de vous rapprocher du Top 50.
                 </p>
                 <div className="mt-4 grid gap-2">
-                  <div className="rounded-2xl border border-[#d9e1ea] bg-white p-3">
+                  <button
+                    className="rounded-2xl border border-[#d9e1ea] bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,.06)]"
+                    onClick={() => onSubscribe("monthly")}
+                    type="button"
+                  >
                     <span className="text-xs font-black uppercase tracking-[0.16em] text-[#697386]">
                       Flexible
                     </span>
@@ -3744,21 +3774,38 @@ function ProfileDrawer({
                     <p className="text-xs font-bold text-[#4e596b]">
                       Sans engagement, résiliable à tout moment.
                     </p>
-                  </div>
-                  <div className="rounded-2xl border border-[#00baff] bg-[#00baff]/10 p-3">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-[#00baff]">
+                  </button>
+                  <button
+                    className="rounded-2xl border border-[#00baff] bg-[#00baff]/10 p-3 text-left shadow-[0_12px_26px_rgba(0,186,255,.12)]"
+                    onClick={() => onSubscribe("annual")}
+                    type="button"
+                  >
+                    <span className="text-xs font-black uppercase tracking-[0.16em] text-[#00a7e6]">
                       Meilleure offre
                     </span>
                     <strong className="mt-1 block text-xl text-[#0b0f19]">
-                      8,99 &euro;/mois pendant 1 an
+                      8,99 &euro;/mois
                     </strong>
                     <p className="text-xs font-bold text-[#4e596b]">
-                      Engagement 12 mois, économisez 72 &euro;.
+                      Engagement sur 1 an : 72 &euro; d&apos;économie.
                     </p>
-                  </div>
+                  </button>
                 </div>
               </div>
-              {isSubscribed ? (
+              {isAnnualCommitmentActive ? (
+                <button
+                  className="h-12 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] px-3 text-sm font-black uppercase text-[#4e596b]"
+                  disabled
+                  type="button"
+                >
+                  Engagé jusqu&apos;au{" "}
+                  {new Intl.DateTimeFormat("fr-FR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  }).format(commitmentEndDate)}
+                </button>
+              ) : isSubscribed ? (
                 <button
                   className="h-12 rounded-2xl border border-[#d9e1ea] bg-white font-black uppercase text-[#0b0f19]"
                   onClick={onManageSubscription}
@@ -3766,24 +3813,7 @@ function ProfileDrawer({
                 >
                   Gérer / résilier
                 </button>
-              ) : (
-                <div className="grid gap-2">
-                  <button
-                    className="h-12 rounded-2xl bg-[#00baff] font-black uppercase text-black"
-                    onClick={() => onSubscribe("monthly")}
-                    type="button"
-                  >
-                    Choisir 14,99 &euro;/mois
-                  </button>
-                  <button
-                    className="h-12 rounded-2xl border border-[#00baff] bg-white font-black uppercase text-[#00a7e6]"
-                    onClick={() => onSubscribe("annual")}
-                    type="button"
-                  >
-                    Choisir 8,99 &euro;/mois
-                  </button>
-                </div>
-              )}
+              ) : null}
             </ProfilePanel>
           )}
 

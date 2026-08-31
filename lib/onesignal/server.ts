@@ -19,6 +19,12 @@ type SendPushInput = {
   url?: string;
 };
 
+type OneSignalResponse = {
+  errors?: unknown;
+  id?: string;
+  warnings?: unknown;
+};
+
 const oneSignalAppId =
   process.env.ONESIGNAL_APP_ID ??
   process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID ??
@@ -92,9 +98,11 @@ export async function sendPushNotification({
     },
     method: "POST",
   });
-  const data = (await response.json().catch(() => null)) as unknown;
+  const data = (await response.json().catch(() => null)) as
+    | OneSignalResponse
+    | null;
 
-  if (!response.ok) {
+  if (!response.ok || data?.id === "") {
     return {
       data,
       error: new Error("Notification OneSignal non envoyée."),

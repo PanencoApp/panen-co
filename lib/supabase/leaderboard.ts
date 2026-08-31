@@ -460,6 +460,9 @@ const recurringContenders = [
 function parisDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("fr-CA", {
     day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
     month: "2-digit",
     timeZone: "Europe/Paris",
     year: "numeric",
@@ -469,6 +472,8 @@ function parisDateParts(date = new Date()) {
     year: Number(parts.find((part) => part.type === "year")?.value),
     month: Number(parts.find((part) => part.type === "month")?.value),
     day: Number(parts.find((part) => part.type === "day")?.value),
+    hour: Number(parts.find((part) => part.type === "hour")?.value),
+    minute: Number(parts.find((part) => part.type === "minute")?.value),
   };
 }
 
@@ -487,6 +492,32 @@ function stableNumber(value: string) {
     (sum, character, index) => sum + character.charCodeAt(0) * (index + 1),
     0,
   );
+}
+
+function hoursSinceWeekStart() {
+  const { year, month, day, hour, minute } = parisDateParts();
+  const parisNow = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const currentDay = parisNow.getUTCDay() === 0 ? 7 : parisNow.getUTCDay();
+
+  return (currentDay - 1) * 24 + hour + minute / 60;
+}
+
+function weeklyProgress() {
+  const hours = hoursSinceWeekStart();
+
+  if (hours < 18) return 0;
+
+  const playableHours = 168 - 18;
+  const rawProgress = Math.min(1, Math.max(0, (hours - 18) / playableHours));
+
+  return Math.pow(rawProgress, 0.72);
+}
+
+function weekMomentKey() {
+  const { year, month, day, hour } = parisDateParts();
+  const period = Math.floor(hour / 6);
+
+  return `${year}-${month}-${day}-${period}`;
 }
 
 export function estimateGlobalRank(points: number, seedKey = "") {
@@ -521,34 +552,56 @@ export function estimateGlobalRank(points: number, seedKey = "") {
 }
 
 function weeklyTopVirtualScore() {
-  return 235 + (stableNumber(`top-${currentWeekStart()}`) % 24);
+  const finalTopScore = 218 + (stableNumber(`top-${currentWeekStart()}`) % 39);
+  const progress = weeklyProgress();
+
+  if (progress <= 0) return 0;
+
+  const liveNoise = stableNumber(`top-live-${currentWeekStart()}-${weekMomentKey()}`) % 8;
+
+  return Math.max(3, Math.round(finalTopScore * progress) + liveNoise);
 }
 
 function virtualScore(rank: number) {
   const topScore = weeklyTopVirtualScore();
 
+  if (topScore <= 0) return 0;
   if (rank === 1) return topScore;
-  if (rank <= 3) return topScore - 5 - rank * 3 - ((rank * 5) % 3);
-  if (rank <= 10) return Math.max(150, topScore - 20 - rank * 5 - ((rank * 3) % 5));
-  if (rank <= 30) return Math.max(92, topScore - 75 - rank * 2 - ((rank * 5) % 7));
-  return Math.max(70, 125 - rank - ((rank * 7) % 6));
+  if (rank <= 3) return Math.max(1, topScore - 3 - rank * 2 - ((rank * 5) % 3));
+  if (rank <= 10) return Math.max(1, topScore - 9 - rank * 3 - ((rank * 3) % 5));
+  if (rank <= 30) return Math.max(1, topScore - 30 - rank * 2 - ((rank * 5) % 7));
+  return Math.max(1, topScore - 58 - rank - ((rank * 7) % 6));
 }
 
 function weeklyPseudoPool() {
   const weekKey = currentWeekStart();
-  const seed = [...weekKey].reduce((sum, character) => sum + character.charCodeAt(0), 0);
-  const recurring = recurringContenders.filter((_, index) => (seed + index) % 3 !== 0);
+  const momentKey = weekMomentKey();
+  const seed = stableNumber(`${weekKey}-${momentKey}`);
+  const contenderCount = 4 + (stableNumber(`contenders-${weekKey}`) % 3);
+  const recurring = [...recurringContenders]
+    .sort((left, right) => {
+      const leftScore = stableNumber(`${left}-${weekKey}`) % 1009;
+      const rightScore = stableNumber(`${right}-${weekKey}`) % 1009;
+
+      return leftScore - rightScore;
+    })
+    .slice(0, contenderCount);
   const uniquePseudos = [...new Set(virtualPseudos)];
   const allPseudos = uniquePseudos.filter((pseudo) => !recurring.includes(pseudo));
 
   const weeklyPseudos = allPseudos.sort((left, right) => {
-    const leftScore = (left.charCodeAt(0) * 31 + left.length * 17 + seed) % 997;
-    const rightScore = (right.charCodeAt(0) * 31 + right.length * 17 + seed) % 997;
+    const leftScore = stableNumber(`${left}-${weekKey}-${seed}`) % 10007;
+    const rightScore = stableNumber(`${right}-${weekKey}-${seed}`) % 10007;
 
     return leftScore - rightScore;
   });
 
-  return [...recurring, ...weeklyPseudos];
+  const earlyRotation = weeklyPseudos.slice(0, 24);
+  const topContenders = recurring.slice(0, 3);
+  const regularContenders = recurring.slice(3);
+  const rest = weeklyPseudos.slice(24);
+
+  return [...topContenders, ...earlyRotation, ...regularContenders, ...rest];
 }
 
 export function rankWeeklyPlayers(players: RankableWeeklyPlayer[]): RankedWeeklyPlayer[] {

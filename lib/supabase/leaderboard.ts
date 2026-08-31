@@ -438,23 +438,18 @@ const virtualPseudos = [
 const recurringContenders = [
   "Lucas Martin",
   "Hugo Bernard",
-  "Max_98",
-  "Romain_OL",
-  "prono_chirurgical",
-  "le_poulpe_des_pronos",
-  "trequartista_fr",
-  "data_and_grinta",
-  "le_specialiste_du_derby",
-  "statman",
-  "le_ticket_gagnant",
-  "le_genie_des_predictions",
-  "letacticien",
-  "MaxDuFoot",
-  "MisterVAR",
-  "Lucarne7",
   "Carlos Ramirez",
+  "James Carter",
+  "Mateo Alvarez",
+  "MisterVAR",
+  "MaxDuFoot",
+  "Lucarne7",
+  "letacticien",
+  "statman",
+  "pronoking",
   "the_final_whistle",
   "el_mago_del_gol",
+  "le_poulpe_des_pronos",
 ];
 
 function parisDateParts(date = new Date()) {
@@ -505,10 +500,10 @@ function hoursSinceWeekStart() {
 function weeklyProgress() {
   const hours = hoursSinceWeekStart();
 
-  if (hours < 18) return 0;
+  if (hours < 10) return 0;
 
-  const playableHours = 168 - 18;
-  const rawProgress = Math.min(1, Math.max(0, (hours - 18) / playableHours));
+  const playableHours = 168 - 10;
+  const rawProgress = Math.min(1, Math.max(0, (hours - 10) / playableHours));
 
   return Math.pow(rawProgress, 0.72);
 }
@@ -573,6 +568,19 @@ function virtualScore(rank: number) {
   return Math.max(1, topScore - 58 - rank - ((rank * 7) % 6));
 }
 
+function pseudoStylePenalty(pseudo: string) {
+  let penalty = 0;
+
+  if (pseudo.includes("_")) penalty += 7000;
+  if (pseudo.toLowerCase().includes("_fc")) penalty += 1200;
+  if (/^[a-z0-9_.-]+$/.test(pseudo)) penalty += 900;
+  if (pseudo.includes(" ")) penalty -= 1200;
+  if (/^[A-Z][a-z]+ [A-Z][a-z]+$/.test(pseudo)) penalty -= 1800;
+  if (/^[A-Z][a-z]+[A-Z][a-z0-9]+$/.test(pseudo)) penalty -= 700;
+
+  return penalty;
+}
+
 function weeklyPseudoPool() {
   const weekKey = currentWeekStart();
   const momentKey = weekMomentKey();
@@ -590,16 +598,18 @@ function weeklyPseudoPool() {
   const allPseudos = uniquePseudos.filter((pseudo) => !recurring.includes(pseudo));
 
   const weeklyPseudos = allPseudos.sort((left, right) => {
-    const leftScore = stableNumber(`${left}-${weekKey}-${seed}`) % 10007;
-    const rightScore = stableNumber(`${right}-${weekKey}-${seed}`) % 10007;
+    const leftScore =
+      (stableNumber(`${left}-${weekKey}-${seed}`) % 10007) + pseudoStylePenalty(left);
+    const rightScore =
+      (stableNumber(`${right}-${weekKey}-${seed}`) % 10007) + pseudoStylePenalty(right);
 
     return leftScore - rightScore;
   });
 
-  const earlyRotation = weeklyPseudos.slice(0, 24);
+  const earlyRotation = weeklyPseudos.slice(0, 38);
   const topContenders = recurring.slice(0, 3);
   const regularContenders = recurring.slice(3);
-  const rest = weeklyPseudos.slice(24);
+  const rest = weeklyPseudos.slice(38);
 
   return [...topContenders, ...earlyRotation, ...regularContenders, ...rest];
 }

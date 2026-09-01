@@ -23,6 +23,15 @@ type PayPalPayoutResponse = {
   };
 };
 
+type PayPalErrorResponse = {
+  details?: Array<{
+    description?: string;
+    issue?: string;
+  }>;
+  message?: string;
+  name?: string;
+};
+
 export const isPayPalConfigured = Boolean(paypalClientId && paypalClientSecret);
 export const isPayPalLive = paypalBaseUrl === "https://api-m.paypal.com";
 export const isPayPalWebhookConfigured = Boolean(paypalWebhookId);
@@ -96,16 +105,29 @@ export async function createPayPalPayout({
     method: "POST",
   });
   const payload = (await response.json().catch(() => null)) as
+    | PayPalErrorResponse
     | PayPalPayoutResponse
     | null;
 
   if (!response.ok) {
-    throw new Error("Impossible de créer le payout PayPal.");
+    const errorPayload = payload as PayPalErrorResponse | null;
+    const detail = errorPayload?.details?.[0];
+    const message = [
+      errorPayload?.name,
+      detail?.issue,
+      detail?.description ?? errorPayload?.message,
+    ]
+      .filter(Boolean)
+      .join(" - ");
+
+    throw new Error(message || "Impossible de créer le payout PayPal.");
   }
 
+  const payoutPayload = payload as PayPalPayoutResponse | null;
+
   return {
-    batchId: payload?.batch_header?.payout_batch_id ?? "",
-    status: payload?.batch_header?.batch_status ?? "PROCESSING",
+    batchId: payoutPayload?.batch_header?.payout_batch_id ?? "",
+    status: payoutPayload?.batch_header?.batch_status ?? "PROCESSING",
   };
 }
 

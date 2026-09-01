@@ -155,6 +155,9 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Payout PayPal impossible.";
+
     await serverSupabase
       .from("user_winnings")
       .update({
@@ -166,8 +169,7 @@ export async function POST(request: NextRequest) {
     await serverSupabase
       .from("withdrawal_requests")
       .update({
-        provider_error:
-          error instanceof Error ? error.message : "Payout PayPal impossible.",
+        provider_error: errorMessage,
         provider_status: "FAILED_TO_CREATE",
         status: "rejected",
         updated_at: new Date().toISOString(),
@@ -175,7 +177,7 @@ export async function POST(request: NextRequest) {
       .eq("id", withdrawal.data.id);
 
     return NextResponse.json(
-      { error: "Retrait impossible, le compte renseigné est introuvable." },
+      { error: `Retrait PayPal impossible : ${errorMessage}` },
       { status: 502 },
     );
   }

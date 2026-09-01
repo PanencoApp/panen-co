@@ -42,6 +42,10 @@ function periodEnd(value?: number) {
   return new Date(value * 1000).toISOString();
 }
 
+function isFutureDate(value?: string | null) {
+  return Boolean(value && new Date(value).getTime() > Date.now());
+}
+
 async function fetchStripeJson<T>(path: string) {
   const response = await fetch(`https://api.stripe.com/v1/${path}`, {
     headers: {
@@ -206,9 +210,30 @@ export async function POST(request: NextRequest) {
 
   const subscription = await serverSupabase
     .from("subscriptions")
-    .select("provider_customer_id")
+    .select("provider_customer_id,plan,commitment_until,status,current_period_end")
     .eq("user_id", user.id)
     .maybeSingle();
+
+  const isActiveSubscription =
+    subscription.data &&
+    (subscription.data.status === "active" ||
+      subscription.data.status === "trialing") &&
+    (!subscription.data.current_period_end ||
+      new Date(subscription.data.current_period_end).getTime() > Date.now());
+
+  if (
+    isActiveSubscription &&
+    subscription.data?.plan === "annual" &&
+    isFutureDate(subscription.data.commitment_until)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Cet abonnement est engagé sur 1 an et ne peut pas être résilié avant la fin de l'engagement.",
+      },
+      { status: 403 },
+    );
+  }
 
   const customerId = subscription.data?.provider_customer_id;
 

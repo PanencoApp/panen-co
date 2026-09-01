@@ -448,6 +448,7 @@ export default function Home() {
       },
     [challengeMatch, dailyMatches],
   );
+  const isSelectedChallengeLocked = selectedChallenge.isPredictable === false;
   const challengeLink = challengePick
     ? buildSharedChallengeLink({
         challengeId: activeChallengeId ?? undefined,
@@ -1623,7 +1624,7 @@ export default function Home() {
 
             <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.10)]">
               <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-3xl border border-[#00baff] text-3xl shadow-[0_0_26px_rgba(0,186,255,.22)]">
-                ?
+                ⚽
               </div>
               <h1 className="text-center text-2xl font-black uppercase">
                 Matchs du jour
@@ -2075,30 +2076,42 @@ export default function Home() {
               <section className="rounded-3xl border border-[#d9e1ea] bg-white p-5">
                 <h2 className="text-xl font-black">Choisis le match</h2>
                 <div className="mt-3 grid gap-2">
-                  {dailyMatches.map((match) => (
-                    <button
-                      className={
-                        (challengeMatch === match.id
-                          ? "border-[#00baff] bg-[#00baff]/10"
-                          : "border-[#d9e1ea] bg-[#eef3f8]") +
-                        " grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl border p-3 text-left"
-                      }
-                      key={match.id}
-                      onClick={() => {
-                        setChallengeMatch(match.id);
-                        setChallengeCopied(false);
-                      }}
-                      type="button"
-                    >
-                      <MatchLogos match={match} />
-                      <span>
-                        <strong className="block">{match.label}</strong>
-                        <small className="font-bold text-[#5f6b7f]">
-                          {match.time}
-                        </small>
-                      </span>
-                    </button>
-                  ))}
+                  {dailyMatches.map((match) => {
+                    const locked = match.isPredictable === false;
+
+                    return (
+                      <button
+                        className={
+                          (locked
+                            ? "cursor-not-allowed border-[#d9e1ea] bg-[#f7f9fc] opacity-40 grayscale"
+                            : challengeMatch === match.id
+                              ? "border-[#00baff] bg-[#00baff]/10"
+                              : "border-[#d9e1ea] bg-[#eef3f8]") +
+                          " grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border p-3 text-left"
+                        }
+                        disabled={locked}
+                        key={match.id}
+                        onClick={() => {
+                          setChallengeMatch(match.id);
+                          setChallengeCopied(false);
+                        }}
+                        type="button"
+                      >
+                        <MatchLogos match={match} />
+                        <span>
+                          <strong className="block">{match.label}</strong>
+                          <small className="font-bold text-[#5f6b7f]">
+                            {match.time}
+                          </small>
+                        </span>
+                        {locked && (
+                          <b className="max-w-[110px] text-right text-xs leading-4 text-[#4e596b]">
+                            Match clôturé
+                          </b>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 <label className="mt-4 block">
                   <span className="text-sm font-black text-[#4e596b]">
@@ -2113,11 +2126,14 @@ export default function Home() {
                   />
                 </label>
                 <button
-                  className="mt-4 h-12 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black"
+                  className="mt-4 h-12 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black disabled:bg-[#d9e1ea] disabled:text-[#697386]"
+                  disabled={isSelectedChallengeLocked}
                   onClick={() => setChallengeStep("predict")}
                   type="button"
                 >
-                  Poser mes predictions
+                  {isSelectedChallengeLocked
+                    ? "Choisis un match ouvert"
+                    : "Poser mes predictions"}
                 </button>
               </section>
             )}

@@ -8,21 +8,31 @@ type StripeCustomerList = {
   }>;
 };
 
+type StripeSubscription = {
+  current_period_end?: number;
+  id?: string;
+  items?: {
+    data?: Array<{
+      price?: {
+        id?: string;
+      };
+    }>;
+  };
+  metadata?: {
+    plan?: string;
+  };
+  status?: string;
+};
+
 type StripeSubscriptionList = {
+  data?: StripeSubscription[];
+};
+
+type StripeCheckoutSessionList = {
   data?: Array<{
-    current_period_end?: number;
-    id?: string;
-    items?: {
-      data?: Array<{
-        price?: {
-          id?: string;
-        };
-      }>;
-    };
-    metadata?: {
-      plan?: string;
-    };
-    status?: string;
+    client_reference_id?: string;
+    customer?: string;
+    subscription?: string;
   }>;
 };
 
@@ -44,6 +54,16 @@ async function fetchStripeJson<T>(path: string) {
   return { data, ok: response.ok };
 }
 
+function activeSubscription(subscription?: StripeSubscription | null) {
+  if (!subscription?.id) return null;
+
+  if (subscription.status !== "active" && subscription.status !== "trialing") {
+    return null;
+  }
+
+  return subscription;
+}
+
 async function findLiveSubscriptionByEmail(email?: string | null) {
   if (!email) return null;
 
@@ -62,16 +82,42 @@ async function findLiveSubscriptionByEmail(email?: string | null) {
 
     if (!subscriptions.ok) continue;
 
-    const activeSubscription = (subscriptions.data?.data ?? []).find(
-      (subscription) =>
-        subscription.status === "active" || subscription.status === "trialing",
+    const subscription = (subscriptions.data?.data ?? []).find((item) =>
+      activeSubscription(item),
     );
 
-    if (!activeSubscription?.id) continue;
+    if (!subscription?.id) continue;
 
     return {
       customerId: customer.id,
-      subscription: activeSubscription,
+      subscription,
+    };
+  }
+
+  return null;
+}
+
+async function findLiveSubscriptionByCheckoutSession(userId: string) {
+  const sessions = await fetchStripeJson<StripeCheckoutSessionList>(
+    "checkout/sessions?limit=100",
+  );
+
+  if (!sessions.ok) return null;
+
+  for (const session of sessions.data?.data ?? []) {
+    if (session.client_reference_id !== userId) continue;
+    if (!session.customer || !session.subscription) continue;
+
+    const subscription = await fetchStripeJson<StripeSubscription>(
+      `subscriptions/${encodeURIComponent(session.subscription)}`,
+    );
+    const active = activeSubscription(subscription.data);
+
+    if (!subscription.ok || !active) continue;
+
+    return {
+      customerId: session.customer,
+      subscription: active,
     };
   }
 
@@ -79,7 +125,9 @@ async function findLiveSubscriptionByEmail(email?: string | null) {
 }
 
 async function repairSubscriptionCustomer(userId: string, email?: string | null) {
-  const liveSubscription = await findLiveSubscriptionByEmail(email);
+  const liveSubscription =
+    (await findLiveSubscriptionByEmail(email)) ??
+    (await findLiveSubscriptionByCheckoutSession(userId));
 
   if (!liveSubscription) return null;
 

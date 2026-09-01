@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appUrl, isStripeConfigured, stripeSecretKey } from "@/lib/stripe/config";
+import {
+  appUrl,
+  isStripeConfigured,
+  stripeAnnualPortalConfigurationId,
+  stripeMonthlyPortalConfigurationId,
+  stripeSecretKey,
+} from "@/lib/stripe/config";
 import { isServerSupabaseConfigured, serverSupabase } from "@/lib/supabase/server";
 
 type StripeCustomerList = {
@@ -160,10 +166,11 @@ async function repairSubscriptionCustomer(userId: string, email?: string | null)
   return liveSubscription.customerId;
 }
 
-async function createPortalSession(customerId: string) {
+async function createPortalSession(customerId: string, configurationId?: string) {
   const body = new URLSearchParams();
   body.set("customer", customerId);
   body.set("return_url", appUrl);
+  if (configurationId) body.set("configuration", configurationId);
 
   const response = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
     body,
@@ -221,19 +228,13 @@ export async function POST(request: NextRequest) {
     (!subscription.data.current_period_end ||
       new Date(subscription.data.current_period_end).getTime() > Date.now());
 
-  if (
+  const isAnnualCommitmentActive =
     isActiveSubscription &&
     subscription.data?.plan === "annual" &&
-    isFutureDate(subscription.data.commitment_until)
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          "Cet abonnement est engagé sur 1 an et ne peut pas être résilié avant la fin de l'engagement.",
-      },
-      { status: 403 },
-    );
-  }
+    isFutureDate(subscription.data.commitment_until);
+  const portalConfigurationId = isAnnualCommitmentActive
+    ? stripeAnnualPortalConfigurationId
+    : stripeMonthlyPortalConfigurationId;
 
   const customerId = subscription.data?.provider_customer_id;
 
@@ -244,13 +245,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let { payload, response: portal } = await createPortalSession(customerId);
+  let { payload, response: portal } = await createPortalSession(
+    customerId,
+    portalConfigurationId,
+  );
 
   if (!portal.ok && payload?.error?.message?.includes("No such customer")) {
     const repairedCustomerId = await repairSubscriptionCustomer(user.id, user.email);
 
     if (repairedCustomerId) {
-      ({ payload, response: portal } = await createPortalSession(repairedCustomerId));
+      ({ payload, response: portal } = await createPortalSession(
+        repairedCustomerId,
+        portalConfigurationId,
+      ));
     }
   }
 

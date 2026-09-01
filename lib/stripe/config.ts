@@ -1,5 +1,9 @@
 export const stripeSecretKey = process.env.STRIPE_SECRET_KEY ?? "";
 export const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+export const stripeMonthlyPortalConfigurationId =
+  process.env.STRIPE_PORTAL_MONTHLY_CONFIG_ID ?? "";
+export const stripeAnnualPortalConfigurationId =
+  process.env.STRIPE_PORTAL_ANNUAL_CONFIG_ID ?? "";
 
 export const stripeMonthlyPriceId =
   process.env.STRIPE_PRICE_MONTHLY_ID ??

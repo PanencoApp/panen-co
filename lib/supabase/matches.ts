@@ -1,4 +1,5 @@
 import type { MatchOption } from "@/types";
+import { matches as demoMatches } from "@/lib/demo-data";
 import { supabase } from "@/lib/supabase/client";
 
 type MatchRow = {
@@ -135,39 +136,34 @@ export async function getTodayMatches(): Promise<MatchesResult> {
     }
   }
 
+  const playableMatches = sourceMatches.length > 0 ? sourceMatches : demoMatches;
+
   if (!supabase) {
     return {
-      data: sourceMatches,
+      data: playableMatches,
       error: new Error("Supabase n'est pas encore configure."),
     };
   }
 
-  if (sourceMatches.length === 0) {
-    return {
-      data: [],
-      error: null,
-    };
-  }
-
-  await seedMissingMatches(sourceMatches);
+  await seedMissingMatches(playableMatches);
 
   const result = await supabase
     .from("matches")
     .select("id, external_id, home_team, away_team, kickoff_at")
     .in(
       "external_id",
-      sourceMatches.map((match) => match.id),
+      playableMatches.map((match) => match.id),
     );
 
   if (result.error || !result.data || result.data.length === 0) {
     return {
-      data: sourceMatches,
+      data: playableMatches,
       error: result.error ?? null,
     };
   }
 
   return {
-    data: mergeMatchesInApiOrder(result.data as MatchRow[], sourceMatches),
+    data: mergeMatchesInApiOrder(result.data as MatchRow[], playableMatches),
     error: null,
   };
 }

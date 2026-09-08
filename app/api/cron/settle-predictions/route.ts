@@ -7,7 +7,6 @@ import {
   isServerSupabaseConfigured,
   serverSupabase,
 } from "@/lib/supabase/server";
-import { syncWeeklyRewards } from "@/lib/supabase/winnings-server";
 import type { PredictionPick } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -220,7 +219,6 @@ async function addWeeklyPoints({
     pseudo,
     week_start: weekStart,
     points: nextPoints,
-    reward_euros: 0,
     updated_at: new Date().toISOString(),
   };
 
@@ -321,10 +319,6 @@ export async function GET(request: NextRequest) {
       .eq("id", match.id);
   }
 
-  const rewards =
-    settled > 0
-      ? await syncWeeklyRewards().catch(() => ({ creditedUsers: 0 }))
-      : { creditedUsers: 0 };
   const dayKey = parisDayKey();
   const notificationReports = [];
 
@@ -349,7 +343,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     checked: rows.length,
-    creditedUsers: rewards.creditedUsers,
     notifications: notificationReports,
     settled,
   });

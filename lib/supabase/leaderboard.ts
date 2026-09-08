@@ -1,12 +1,10 @@
 import type { TopPlayer } from "@/types";
-import { rewardForRank } from "@/lib/scoring";
 import { supabase } from "@/lib/supabase/client";
 
 type WeeklyScoreRow = {
   user_id: string;
   pseudo: string | null;
   points: number;
-  reward_euros: number;
 };
 
 export type RankableWeeklyPlayer = {
@@ -621,7 +619,6 @@ export function rankWeeklyPlayers(players: RankableWeeklyPlayer[]): RankedWeekly
     userId: player.userId,
     pseudo: player.pseudo,
     points: player.points,
-    reward: 0,
     isCurrentUser: Boolean(player.isCurrentUser),
     isVirtual: Boolean(player.isVirtual),
   }));
@@ -637,7 +634,6 @@ export function rankWeeklyPlayers(players: RankableWeeklyPlayer[]): RankedWeekly
       rank: virtualRank,
       pseudo,
       points: virtualScore(virtualRank),
-      reward: rewardForRank(virtualRank),
       isCurrentUser: false,
       isVirtual: true,
     });
@@ -653,7 +649,6 @@ export function rankWeeklyPlayers(players: RankableWeeklyPlayer[]): RankedWeekly
     .map((player, index) => ({
       ...player,
       rank: index + 1,
-      reward: rewardForRank(index + 1),
       isCurrentUser: player.isCurrentUser,
     }));
 }
@@ -667,7 +662,7 @@ export async function getWeeklyLeaderboard(currentUserId?: string | null) {
 
   const result = await supabase
     .from("weekly_scores")
-    .select("user_id, pseudo, points, reward_euros")
+    .select("user_id, pseudo, points")
     .eq("week_start", currentWeekStart())
     .order("points", { ascending: false })
     .limit(50);
@@ -730,7 +725,6 @@ export async function addWeeklyPoints({
     pseudo,
     week_start: weekStart,
     points: nextPoints,
-    reward_euros: 0,
     updated_at: new Date().toISOString(),
   };
 

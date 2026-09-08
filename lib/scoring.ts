@@ -8,14 +8,6 @@ export type MatchResult = {
   lastTeam: "Domicile" | "Exterieur" | "Aucun";
 };
 
-export function rewardForRank(rank: number) {
-  if (rank === 1) return 150;
-  if (rank <= 3) return 100;
-  if (rank <= 10) return 50;
-  if (rank <= 30) return 30;
-  return 10;
-}
-
 function normalize(value: string) {
   return value
     .trim()

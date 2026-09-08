@@ -54,16 +54,8 @@ import {
 } from "@/lib/supabase/leaderboard";
 import {
   getAdminDashboard,
-  getAdminWithdrawalRequests,
-  getMyWithdrawalRequests,
-  getMyWinnings,
-  requestWithdrawal,
-  syncMyWeeklyWinnings,
-  updateAdminWithdrawalStatus,
   type AdminDashboard,
   type AdminUserOverview,
-  type AdminWithdrawalRequest,
-  type WithdrawalRequest,
 } from "@/lib/supabase/winnings";
 import type {
   MatchOption,
@@ -397,9 +389,7 @@ export default function Home() {
   const [predictions, setPredictions] = useState<PredictionRecord[]>([]);
   const [leaderboard, setLeaderboard] = useState<TopPlayer[]>([]);
   const [weeklyPoints, setWeeklyPoints] = useState(0);
-  const [winningsBalance, setWinningsBalance] = useState(0);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
-  const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
   const [challengeMatch, setChallengeMatch] = useState("");
   const [challengeStep, setChallengeStep] = useState<
     "setup" | "predict" | "share" | "friend" | "result"
@@ -416,7 +406,6 @@ export default function Home() {
     useState<SharedChallenge | null>(null);
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
-  const [showWithdrawal, setShowWithdrawal] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [profileInitialSection, setProfileInitialSection] = useState<
     "history" | "subscription" | "security" | "about" | "help" | "admin"
@@ -426,11 +415,8 @@ export default function Home() {
   const [authBusy, setAuthBusy] = useState(false);
   const [seenResultIds, setSeenResultIds] = useState<string[]>([]);
   const [resultPopupIds, setResultPopupIds] = useState<string[]>([]);
-  const [adminTab, setAdminTab] = useState<
-    "users" | "scores" | "subscriptions" | "withdrawals"
-  >("users");
+  const [adminTab, setAdminTab] = useState<"users" | "scores" | "subscriptions">("users");
   const [adminDashboard, setAdminDashboard] = useState<AdminDashboard | null>(null);
-  const [adminWithdrawals, setAdminWithdrawals] = useState<AdminWithdrawalRequest[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
 
   const selected = useMemo(
@@ -640,9 +626,7 @@ export default function Home() {
           setDailyMatches([]);
           setLeaderboard([]);
           setWeeklyPoints(0);
-          setWinningsBalance(0);
           setSubscription(null);
-          setWithdrawalRequests([]);
           setSeenResultIds([]);
           setResultPopupIds([]);
           setPendingSharedChallenge(sharedChallenge);
@@ -690,11 +674,6 @@ export default function Home() {
         if (isMounted) setLeaderboard(weeklyPlayers);
         const currentPoints = await getMyWeeklyPoints(user.id);
         if (isMounted) setWeeklyPoints(currentPoints);
-        await syncMyWeeklyWinnings();
-        const winnings = await getMyWinnings(user.id);
-        if (isMounted) setWinningsBalance(winnings.balance);
-        const withdrawals = await getMyWithdrawalRequests(user.id);
-        if (isMounted) setWithdrawalRequests(withdrawals);
         const seenIds = readSeenResultIds(user.id);
         const watchedIds = readWatchedResultIds(user.id);
         const activeIds = restoredPredictions
@@ -915,11 +894,6 @@ export default function Home() {
       setLeaderboard(weeklyPlayers);
       const currentPoints = await getMyWeeklyPoints(currentUserId);
       setWeeklyPoints(currentPoints);
-      await syncMyWeeklyWinnings();
-      const winnings = await getMyWinnings(currentUserId);
-      setWinningsBalance(winnings.balance);
-      const withdrawals = await getMyWithdrawalRequests(currentUserId);
-      setWithdrawalRequests(withdrawals);
     }
 
     setPredictions((items) =>
@@ -1208,10 +1182,7 @@ export default function Home() {
     if (!userProfile.isAdmin) return;
 
     setAdminLoading(true);
-    const [dashboard, withdrawals] = await Promise.all([
-      getAdminDashboard(),
-      getAdminWithdrawalRequests(),
-    ]);
+    const dashboard = await getAdminDashboard();
     setAdminLoading(false);
 
     if (dashboard.error) {
@@ -1219,13 +1190,7 @@ export default function Home() {
       return;
     }
 
-    if (withdrawals.error) {
-      window.alert(withdrawals.error.message);
-      return;
-    }
-
     setAdminDashboard(dashboard.data);
-    setAdminWithdrawals(withdrawals.data);
   }
 
   function openAdminDashboard() {
@@ -1235,19 +1200,6 @@ export default function Home() {
     if (!adminDashboard) {
       void loadAdminData();
     }
-  }
-
-  async function updateWithdrawal(id: string, status: string) {
-    const result = await updateAdminWithdrawalStatus({ id, status });
-
-    if (result.error || !result.data) {
-      window.alert(result.error?.message ?? "Impossible de modifier le retrait.");
-      return;
-    }
-
-    setAdminWithdrawals((items) =>
-      items.map((item) => (item.id === id ? result.data! : item)),
-    );
   }
 
   async function startSubscriptionCheckout(plan: SubscriptionPlan) {
@@ -1328,20 +1280,13 @@ export default function Home() {
         setLeaderboard(weeklyPlayers);
         const currentPoints = await getMyWeeklyPoints(result.data.user.id);
         setWeeklyPoints(currentPoints);
-        await syncMyWeeklyWinnings();
-        const winnings = await getMyWinnings(result.data.user.id);
-        setWinningsBalance(winnings.balance);
-        const withdrawals = await getMyWithdrawalRequests(result.data.user.id);
-        setWithdrawalRequests(withdrawals);
       } else {
         setTokens(1);
         setPredictions([]);
         const weeklyPlayers = await getWeeklyLeaderboard(null);
         setLeaderboard(weeklyPlayers);
         setWeeklyPoints(0);
-        setWinningsBalance(0);
         setSubscription(null);
-        setWithdrawalRequests([]);
       }
       const sharedChallenge = pendingSharedChallenge ?? readSharedChallengeFromUrl();
 
@@ -1404,11 +1349,6 @@ export default function Home() {
       setLeaderboard(weeklyPlayers);
       const currentPoints = await getMyWeeklyPoints(result.data.user.id);
       setWeeklyPoints(currentPoints);
-      await syncMyWeeklyWinnings();
-      const winnings = await getMyWinnings(result.data.user.id);
-      setWinningsBalance(winnings.balance);
-      const withdrawals = await getMyWithdrawalRequests(result.data.user.id);
-      setWithdrawalRequests(withdrawals);
       const sharedChallenge = pendingSharedChallenge ?? readSharedChallengeFromUrl();
 
       if (sharedChallenge) {
@@ -1491,13 +1431,10 @@ export default function Home() {
     setPredictions([]);
     setLeaderboard([]);
     setWeeklyPoints(0);
-    setWinningsBalance(0);
     setSubscription(null);
-    setWithdrawalRequests([]);
     setSeenResultIds([]);
     setResultPopupIds([]);
     setAdminDashboard(null);
-    setAdminWithdrawals([]);
     setOnboardingStep("login");
     setView("home");
   }
@@ -1609,16 +1546,12 @@ export default function Home() {
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-[#d9e1ea] pt-3">
                 <span className="text-xs font-black uppercase text-[#5f6b7f]">
-                  Gains
+                  Score semaine
                 </span>
-                <b>{winningsBalance} &euro;</b>
-                <button
-                  className="rounded-full border border-[#d8e2ea] px-3 py-1 text-xs font-black"
-                  onClick={() => setShowWithdrawal(true)}
-                  type="button"
-                >
-                  Retirer
-                </button>
+                <b>{weeklyPoints} pts</b>
+                <span className="rounded-full border border-[#d8e2ea] px-3 py-1 text-xs font-black">
+                  Top 50
+                </span>
               </div>
             </section>
 
@@ -1725,7 +1658,7 @@ export default function Home() {
           <section className="space-y-4">
             <Header
               title="Dashboard admin"
-              subtitle="Utilisateurs, scores, abonnements et retraits"
+              subtitle="Utilisateurs, scores et abonnements"
               right="Admin"
               onBack={() => setView("home")}
             />
@@ -1766,12 +1699,11 @@ export default function Home() {
 
                 <section className="rounded-3xl border border-[#d9e1ea] bg-white p-3">
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                    {[
+                    {([
                       ["users", "Utilisateurs"],
                       ["scores", "Scores"],
                       ["subscriptions", "Abonnements"],
-                      ["withdrawals", "Retraits"],
-                    ].map(([id, label]) => (
+                    ] as const).map(([id, label]) => (
                       <button
                         className={
                           (adminTab === id
@@ -1780,7 +1712,7 @@ export default function Home() {
                           " h-12 rounded-2xl border text-xs font-black uppercase"
                         }
                         key={id}
-                        onClick={() => setAdminTab(id as typeof adminTab)}
+                        onClick={() => setAdminTab(id)}
                         type="button"
                       >
                         {label}
@@ -1804,12 +1736,6 @@ export default function Home() {
                     )}
                     {adminTab === "subscriptions" && (
                       <AdminSubscriptions users={adminDashboard.users} />
-                    )}
-                    {adminTab === "withdrawals" && (
-                      <AdminWithdrawals
-                        requests={adminWithdrawals}
-                        onUpdate={updateWithdrawal}
-                      />
                     )}
                   </section>
                 ) : (
@@ -2251,34 +2177,6 @@ export default function Home() {
           onLogout={logout}
           onOpenAdmin={openAdminDashboard}
           predictions={predictions}
-          userProfile={userProfile}
-          withdrawalRequests={withdrawalRequests}
-        />
-      )}
-      {showWithdrawal && (
-        <WithdrawalModal
-          balance={winningsBalance}
-          onClose={() => setShowWithdrawal(false)}
-          onSubmit={async ({ amount, paypalEmail }) => {
-            const result = await requestWithdrawal({ amount, paypalEmail });
-
-            if (result.error || !result.data) {
-              window.alert(result.error?.message ?? "Impossible de demander le retrait.");
-              return;
-            }
-
-            setWinningsBalance(result.data.balance);
-            setWithdrawalRequests((items) => [
-              result.data!.withdrawal,
-              ...items,
-            ]);
-            setShowWithdrawal(false);
-            window.alert(
-              result.data.withdrawal.status === "processing"
-                ? "Retrait validé, vous recevrez l'argent sur votre compte PayPal dans quelques instants."
-                : "Retrait impossible, le compte renseigné est introuvable.",
-            );
-          }}
           userProfile={userProfile}
         />
       )}
@@ -3420,134 +3318,6 @@ function TokenModal({
   );
 }
 
-function withdrawalStatusLabel(status: string) {
-  if (status === "paid") return "Payé";
-  if (status === "rejected") return "Refusé";
-  if (status === "processing") return "En paiement";
-  return "Non finalisé";
-}
-
-function WithdrawalModal({
-  balance,
-  onClose,
-  onSubmit,
-  userProfile,
-}: {
-  balance: number;
-  onClose: () => void;
-  onSubmit: (payload: {
-    amount: number;
-    paypalEmail: string;
-  }) => void | Promise<void>;
-  userProfile: UserProfile;
-}) {
-  const [amount, setAmount] = useState(Math.min(balance, Math.max(1, balance)));
-  const canWithdraw = balance >= 1;
-
-  async function submitWithdrawal(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const paypalEmail = String(form.get("paypalEmail") ?? "").trim();
-
-    await onSubmit({ amount, paypalEmail });
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-5 backdrop-blur-lg">
-      <form
-        className="w-full max-w-[430px] rounded-3xl border border-[#d9e1ea] bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,.10)]"
-        onSubmit={submitWithdrawal}
-      >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <div className="mb-3 inline-flex h-12 items-center rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] px-4">
-              <Image
-                alt="PayPal"
-                className="h-auto w-28 object-contain"
-                height={36}
-                src="/paypal-logo.webp"
-                width={140}
-              />
-            </div>
-            <h2 className="text-2xl font-black">Retirer mes gains</h2>
-          </div>
-          <button
-            className="grid h-10 w-10 place-items-center rounded-full border border-[#d9e1ea] text-lg font-black"
-            onClick={onClose}
-            type="button"
-          >
-            x
-          </button>
-        </div>
-
-        <div className="rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-4">
-          <span className="text-xs font-black uppercase text-[#4e596b]">
-            Solde disponible
-          </span>
-          <strong className="mt-1 block text-4xl text-[#00baff]">
-            {balance} &euro;
-          </strong>
-          <p className="mt-2 text-sm font-bold text-[#4e596b]">
-            Minimum temporaire de test : 1 &euro;. Le paiement est envoy&eacute; vers
-            ton compte PayPal.
-          </p>
-        </div>
-
-        {canWithdraw ? (
-          <div className="mt-4 grid gap-3">
-            <label className="grid gap-2">
-              <span className="text-xs font-black uppercase text-[#4e596b]">
-                Montant
-              </span>
-              <input
-                className="input"
-                max={balance}
-                min={1}
-                onChange={(event) => setAmount(Number(event.target.value))}
-                required
-                type="number"
-                value={amount}
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-xs font-black uppercase text-[#4e596b]">
-                Email PayPal
-              </span>
-              <input
-                className="input"
-                defaultValue={userProfile.email}
-                name="paypalEmail"
-                placeholder="email@exemple.com"
-                required
-                type="email"
-              />
-            </label>
-            <button
-              className="h-13 rounded-2xl bg-[#00baff] font-black uppercase text-black"
-              type="submit"
-            >
-              Demander le retrait
-            </button>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold leading-6 text-[#4e596b]">
-            Tu pourras demander un retrait dès que ton solde gains atteindra
-            1 &euro;.
-          </div>
-        )}
-
-        <button
-          className="mt-3 h-12 w-full rounded-2xl border border-[#00baff] font-black uppercase text-[#00baff]"
-          onClick={onClose}
-          type="button"
-        >
-          Fermer
-        </button>
-      </form>
-    </div>
-  );
-}
-
 function ProfileDrawer({
   initialSection,
   isSubscribed,
@@ -3559,7 +3329,6 @@ function ProfileDrawer({
   onOpenAdmin,
   predictions,
   userProfile,
-  withdrawalRequests,
 }: {
   initialSection: "history" | "subscription" | "security" | "about" | "help" | "admin";
   isSubscribed: boolean;
@@ -3571,14 +3340,12 @@ function ProfileDrawer({
   onOpenAdmin: () => void;
   predictions: PredictionRecord[];
   userProfile: UserProfile;
-  withdrawalRequests: WithdrawalRequest[];
 }) {
   const isAdmin = userProfile.isAdmin === true;
   const [section, setSection] = useState<
     "history" | "subscription" | "security" | "about" | "help" | "admin"
   >(initialSection);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [historyTab, setHistoryTab] = useState<"predictions" | "withdrawals">("predictions");
   const [now] = useState(() => Date.now());
   const commitmentEndDate = subscription?.commitmentUntil
     ? new Date(subscription.commitmentUntil)
@@ -3827,105 +3594,46 @@ function ProfileDrawer({
 
           {section === "history" && (
             <ProfilePanel title="Historique">
-              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-1">
-                {[
-                  ["predictions", "Prédictions"],
-                  ["withdrawals", "Retraits"],
-                ].map(([id, label]) => (
-                  <button
-                    className={
-                      (historyTab === id
-                        ? "bg-[#00baff] text-black shadow-[0_10px_20px_rgba(0,186,255,.18)]"
-                        : "bg-transparent text-[#4e596b]") +
-                      " h-10 rounded-xl text-sm font-black"
-                    }
-                    key={id}
-                    onClick={() => setHistoryTab(id as "predictions" | "withdrawals")}
-                    type="button"
+              {historyItems.length > 0 ? (
+                historyItems.map((item) => (
+                  <div
+                    className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
+                    key={item.id}
                   >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {historyTab === "predictions" &&
-                (historyItems.length > 0 ? (
-                  historyItems.map((item) => (
-                    <div
-                      className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
-                      key={item.id}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <strong className="block">{item.matchLabel}</strong>
-                          <span className="text-sm font-bold text-[#4e596b]">
-                            {item.date}
-                          </span>
-                        </div>
-                        <b
-                          className={
-                            (item.status === "done"
-                              ? "bg-[#00baff] text-black"
-                              : "bg-[#eef3f8] text-[#4e596b]") +
-                            " rounded-xl px-3 py-2 text-sm"
-                          }
-                        >
-                          {item.status === "done"
-                            ? `${item.score ?? 0} pts`
-                            : "En cours"}
-                        </b>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <strong className="block">{item.matchLabel}</strong>
+                        <span className="text-sm font-bold text-[#4e596b]">
+                          {item.date}
+                        </span>
                       </div>
-                      <details className="mt-3 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-3">
-                        <summary className="cursor-pointer text-sm font-black text-[#00baff]">
-                          Voir ma grille
-                        </summary>
-                        <PredictionDetails pick={item.pick} />
-                      </details>
+                      <b
+                        className={
+                          (item.status === "done"
+                            ? "bg-[#00baff] text-black"
+                            : "bg-[#eef3f8] text-[#4e596b]") +
+                          " rounded-xl px-3 py-2 text-sm"
+                        }
+                      >
+                        {item.status === "done"
+                          ? `${item.score ?? 0} pts`
+                          : "En cours"}
+                      </b>
                     </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
-                    Aucune prédiction pour le moment. Dès que tu valides une
-                    grille, elle apparaît ici.
+                    <details className="mt-3 rounded-2xl border border-[#d9e1ea] bg-[#f6f8fb] p-3">
+                      <summary className="cursor-pointer text-sm font-black text-[#00baff]">
+                        Voir ma grille
+                      </summary>
+                      <PredictionDetails pick={item.pick} />
+                    </details>
                   </div>
-                ))}
-
-              {historyTab === "withdrawals" &&
-                (withdrawalRequests.length > 0 ? (
-                  withdrawalRequests.map((request) => (
-                    <div
-                      className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
-                      key={request.id}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <strong className="block">
-                            {request.amount} &euro; vers PayPal
-                          </strong>
-                          {request.paypalEmail && (
-                            <span className="block text-sm font-bold text-[#4e596b]">
-                              {request.paypalEmail}
-                            </span>
-                          )}
-                          <span className="text-sm font-bold text-[#4e596b]">
-                            {new Intl.DateTimeFormat("fr-FR", {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            }).format(new Date(request.createdAt))}
-                          </span>
-                        </div>
-                        <b className="rounded-xl bg-[#eef3f8] px-3 py-2 text-xs uppercase text-[#4e596b]">
-                          {withdrawalStatusLabel(request.status)}
-                        </b>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
-                    Aucun retrait demandé pour le moment.
-                  </div>
-                ))}
+                ))
+              ) : (
+                <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
+                  Aucune prédiction pour le moment. Dès que tu valides une
+                  grille, elle apparaît ici.
+                </div>
+              )}
             </ProfilePanel>
           )}
           {section === "security" && (
@@ -3973,7 +3681,7 @@ function ProfileDrawer({
                 <strong className="block text-lg">Tableau de bord admin</strong>
                 <span className="mt-1 block text-sm font-bold leading-6 text-[#4e596b]">
                   Ouvre une page dédiée pour suivre les utilisateurs, les scores,
-                  les abonnements et les demandes de retrait avec plus d’espace.
+                  les abonnements et l&apos;activité de l&apos;app avec plus d’espace.
                 </span>
                 <button
                   className="mt-4 h-12 w-full rounded-2xl bg-[#00baff] font-black uppercase text-black"
@@ -4179,78 +3887,6 @@ function AdminSubscriptions({ users }: { users: AdminUserOverview[] }) {
   );
 }
 
-function AdminWithdrawals({
-  onUpdate,
-  requests,
-}: {
-  onUpdate: (id: string, status: string) => void;
-  requests: AdminWithdrawalRequest[];
-}) {
-  return (
-    <div className="grid gap-3">
-      {requests.length > 0 ? (
-        requests.map((request) => (
-          <div
-            className="rounded-2xl border border-[#d9e1ea] bg-white p-4"
-            key={request.id}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <strong className="block text-lg">
-                  {request.amount} &euro; · {request.userPseudo}
-                </strong>
-                <span className="block text-sm font-bold text-[#4e596b]">
-                  {request.userEmail}
-                </span>
-                <span className="block text-sm font-bold text-[#4e596b]">
-                  PayPal : {request.paypalEmail || request.holderName}
-                </span>
-                {request.providerPayoutId && (
-                  <span className="block text-sm font-bold text-[#4e596b]">
-                    Batch PayPal : {request.providerPayoutId}
-                  </span>
-                )}
-                {request.providerStatus && (
-                  <span className="block text-sm font-bold text-[#4e596b]">
-                    Statut PayPal : {request.providerStatus}
-                  </span>
-                )}
-              </div>
-              <b className="rounded-xl bg-[#eef3f8] px-3 py-2 text-xs uppercase text-[#4e596b]">
-                {withdrawalStatusLabel(request.status)}
-              </b>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {[
-                ["pending", "Non finalisé"],
-                ["processing", "Paiement"],
-                ["paid", "Payé"],
-                ["rejected", "Refusé"],
-              ].map(([status, label]) => (
-                <button
-                  className={
-                    (request.status === status
-                      ? "border-[#00baff] bg-[#00baff] text-black"
-                      : "border-[#d9e1ea] bg-white text-[#0b0f19]") +
-                    " h-10 rounded-xl border text-xs font-black uppercase"
-                  }
-                  key={status}
-                  onClick={() => onUpdate(request.id, status)}
-                  type="button"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))
-      ) : (
-        <EmptyAdminState text="Aucune demande de retrait pour le moment." />
-      )}
-    </div>
-  );
-}
-
 function EmptyAdminState({ text }: { text: string }) {
   return (
     <div className="rounded-2xl border border-[#d9e1ea] bg-white p-4 text-sm font-bold text-[#4e596b]">
@@ -4270,11 +3906,11 @@ function AboutContent() {
         <p className="mt-2">
           Panen&amp;Co est l&apos;arene de pronostics footballistiques ultime
           concue pour elire le plus grand connaisseur de football. Notre
-          application est 100 % gratuite, ouverte a tous et financee par la
-          publicite et les abonnements optionnels. Aucun depot d&apos;argent pour
-          parier n&apos;est requis ni autorise. Ici, seule votre sagacite sportive
-          vous permet de grimper au sommet des classements et de remporter les
-          prix mis en jeu par la plateforme.
+          application repose sur les points, les jetons et les classements.
+          Aucun depot d&apos;argent pour parier n&apos;est requis ni autorise, aucun
+          retrait n&apos;est propose et les points n&apos;ont aucune valeur monetaire.
+          Ici, seule votre sagacite sportive vous permet de grimper au sommet
+          des classements.
         </p>
       </section>
 
@@ -4284,7 +3920,7 @@ function AboutContent() {
       />
       <InfoBlock
         title="Jetons"
-        text="1 jeton gratuit est offert automatiquement chaque jour. Le 5 du mois, tous les utilisateurs reçoivent 5 jetons gratuits. Regardez une vidéo publicitaire de 20 secondes pour débloquer +1 jeton. L'abonnement Premium débloque 5 jetons quotidiens sans publicité."
+        text="1 jeton gratuit est offert automatiquement chaque jour. Le 5 du mois, tous les utilisateurs recoivent 5 jetons gratuits. L'abonnement Premium debloque 5 jetons quotidiens pour multiplier les pronostics et viser le Top 50."
       />
       <InfoBlock
         title="Classement Hebdomadaire"
@@ -4292,13 +3928,13 @@ function AboutContent() {
       />
 
       <section className="rounded-2xl border border-[#d9e1ea] bg-white p-4">
-        <h4 className="font-black text-[#0b0f19]">Grille des Prix</h4>
+        <h4 className="font-black text-[#0b0f19]">Paliers de reputation</h4>
         <ul className="mt-3 grid gap-2">
-          <li>Top 1 : 150 euro</li>
-          <li>Top 2 a 3 : 100 euro</li>
-          <li>Top 4 a 10 : 50 euro</li>
-          <li>Top 11 a 30 : 30 euro</li>
-          <li>Top 31 a 50 : 10 euro</li>
+          <li>1 a 30 pts : T&apos;es sur de connaitre le foot ?</li>
+          <li>30 a 90 pts : Petit joueur</li>
+          <li>90 a 150 pts : Tu peux te permettre de parler football</li>
+          <li>150 a 210 pts : Connaisseur</li>
+          <li>210 a 315 pts : Tu es un expert football</li>
         </ul>
       </section>
 
@@ -4317,15 +3953,15 @@ function AboutContent() {
         <div className="mt-4 grid gap-3">
           <InfoBlock
             title="1. Objet du Service"
-            text="Panen&Co est un jeu-concours gratuit de pronostics sportifs base sur les connaissances des utilisateurs. Panen&Co n'est ni un site de paris sportifs, ni un operateur de jeux d'argent. L'application ne propose aucune fonctionnalite de mise financiere de la part des utilisateurs."
+            text="Panen&Co est une application de pronostics sportifs basee sur les connaissances des utilisateurs. Panen&Co n'est ni un site de paris sportifs, ni un operateur de jeux d'argent. L'application ne propose aucune mise financiere, aucun gain monetaire et aucun retrait."
           />
           <InfoBlock
             title="2. Eligibilite & Inscription"
-            text="L'acces aux classements dotes implique d'etre une personne physique agee de 18 ans ou plus et de posseder un compte unique associe a une adresse email et un pseudonyme valide. Le multicompte entraine un bannissement immediat et definitif."
+            text="L'acces aux classements implique de posseder un compte unique associe a une adresse email et un pseudonyme valide. Le multicompte entraine un bannissement immediat et definitif."
           />
           <InfoBlock
-            title="3. Gains & Abonnements"
-            text="Les dotations sont offertes par Panen&Co et financées par la publicité et les abonnements Premium. L'offre mensuelle à 14,99 euro / mois est sans engagement et résiliable à tout moment. L'offre annuelle à 8,99 euro / mois implique un engagement de 12 mois et permet d'économiser 72 euro sur l'année. Un solde minimal de 20 euro est requis pour demander un versement, soumis à vérification d'identité et de majorité."
+            title="3. Jetons & Abonnements"
+            text="Les jetons permettent de participer a davantage de pronostics. Ils ne constituent pas une monnaie virtuelle, ne sont pas echangeables contre de l'argent et ne donnent droit a aucun versement. L'offre mensuelle a 14,99 euro / mois est sans engagement et resiliable a tout moment. L'offre annuelle a 8,99 euro / mois implique un engagement de 12 mois et permet d'economiser 72 euro sur l'annee."
           />
           <InfoBlock
             title="4. Anti-Triche et Fair-Play"

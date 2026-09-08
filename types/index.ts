@@ -79,7 +79,6 @@ export type TopPlayer = {
   rank: number;
   pseudo: string;
   points: number;
-  reward: number;
   isCurrentUser: boolean;
   isVirtual?: boolean;
 };

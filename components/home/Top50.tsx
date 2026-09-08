@@ -85,7 +85,7 @@ export function Top50({
                 {player.points} pts
               </b>
               <small className="mt-1 block rounded-full border border-[#d9e1ea] bg-white px-2 py-1 text-xs font-black text-[#0b0f19] shadow-[0_8px_18px_rgba(15,23,42,.08)]">
-                +{player.reward} &euro;
+                Rang #{player.rank}
               </small>
             </span>
           </div>

@@ -28,7 +28,6 @@ type SubscriptionRow = {
 
 type WeeklyScoreRow = {
   points: number;
-  reward_euros: number;
   user_id: string;
 };
 
@@ -103,7 +102,7 @@ export async function GET(request: NextRequest) {
         .order("created_at", { ascending: false }),
       serverSupabase
         .from("weekly_scores")
-        .select("user_id, points, reward_euros")
+        .select("user_id, points")
         .eq("week_start", currentWeekStart()),
       serverSupabase
         .from("predictions")
@@ -176,7 +175,6 @@ export async function GET(request: NextRequest) {
       subscriptionStatus: subscription?.status ?? "inactive",
       subscriptionUntil: subscription?.current_period_end ?? null,
       weeklyPoints: weeklyById.get(profile.id)?.points ?? 0,
-      weeklyReward: weeklyById.get(profile.id)?.reward_euros ?? 0,
     };
   });
 

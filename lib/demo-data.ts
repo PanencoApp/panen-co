@@ -1,5 +1,4 @@
 import type { HistoryItem, MatchOption, TopPlayer, UserProfile } from "@/types";
-import { rewardForRank } from "@/lib/scoring";
 
 export const currentUser = "admin";
 
@@ -61,7 +60,6 @@ export const topPlayers: TopPlayer[] = Array.from({ length: 50 }, (_, index) => 
       ? currentUser
       : playerNames[index % playerNames.length] + (rank > 10 ? rank : ""),
     points: 1380 - index * 23,
-    reward: rewardForRank(rank),
     isCurrentUser,
   };
 });

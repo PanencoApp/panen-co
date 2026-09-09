@@ -173,7 +173,7 @@ const teamTranslations = new Map<string, string>([
 ]);
 
 const unreliableMatchPattern =
-  /\b(u\d{2}|u-\d{2}|under\s*\d{2}|youth|reserve|reserves|women|feminine|feminino|amateur|academy|sub-\d{2})\b/i;
+  /\b(u\d{2}|u-\d{2}|under\s*\d{2}|youth|reserve|reserves|women|woman|female|feminine|féminin|féminine|feminino|feminina|w\b|amateur|academy|sub-\d{2})\b/i;
 
 function translateTeam(name?: string) {
   if (!name) return "Équipe";
